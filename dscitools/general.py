@@ -15,12 +15,12 @@ def today():
     return datetime.date.today().isoformat()
 
 
-def show_count(n,
-               description=None,
-               n_overall=None,
-               overall_description=None,
-               show_n_overall=True,
-               print_result=True):
+def fmt_count(n,
+              description=None,
+              n_overall=None,
+              overall_description=None,
+              show_n_overall=True,
+              print_result=True):
     """Pretty-print a count together with some contextual information.
 
     This is generally useful for counts computed as part of an analysis or as a
