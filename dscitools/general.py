@@ -42,11 +42,11 @@ def fmt_count(n,
 
     Parameters
     ----------
-    n : int or float
+    n : numeric
         The number to be formatted
     description : str, optional
         Description of what the number `n` represents
-    n_overall : int or float, optional
+    n_overall : numeric, optional
         Overall total, out of which `n` represents the amount in a subset
     description_overall : str, optional
         Description of what the overall total `n_overall` represents. This is
