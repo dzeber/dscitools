@@ -56,9 +56,9 @@ def test_explicit_formatter_override(df):
     fmt_api = fmt_df(df, fmt_percent="prop")
     ## Spacing for positive/negative signs must be specified explicitly here.
     explicit_fmt = {
-        ## This should override the dynamic detection of "num" as an int column.
+        ## This should override dynamic detection of "num" as an int column.
         "num": "{: .1f}".format,
-        ## This should override the static formatting of "prop" as a pct column.
+        ## This should override static formatting of "prop" as a pct column.
         "prop": "{: .4f}".format
     }
     assert fmt_obj.to_string(formatters=explicit_fmt) == \

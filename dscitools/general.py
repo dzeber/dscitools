@@ -2,7 +2,6 @@
 General utilities.
 """
 
-
 import datetime
 
 
@@ -22,11 +21,11 @@ def show_count(n,
                overall_description=None,
                show_n_overall=True,
                print_result=True):
-    """Pretty-print a count.
+    """Pretty-print a count together with some contextual information.
 
-    This presents a count computed as part of an analysis or as a diagnostic,
-    together with some contextual information. Although it is designed for integer
-    counts, it can be used with any numeric value representing an amount.
+    This is generally useful for counts computed as part of an analysis or as a
+    diagnostic. Although designed for integer counts, this can be used with any
+    numeric value representing an amount.
 
     If `show_n_overall` is `True`, the result is a string of the form
 
@@ -51,22 +50,22 @@ def show_count(n,
         Overall total, out of which `n` represents the amount in a subset
     description_overall : str, optional
         Description of what the overall total `n_overall` represents. This is
-        useful if `n` is some specific subset out of a more general overall group.
-        Ignored if `n_overall` is not given.
+        useful if `n` is some specific subset out of a more general overall
+        group. Ignored if `n_overall` is not given.
     show_n_overall : bool
-        Should the overall total be included in the formatted string? If `False`,
-        but `n_overall` is specified, the result will include the percentage value
-        of `n` out of `n_overall`, but not `n_overall` itself. Ignored if
-        `n_overall` is not given.
+        Should the overall total be included in the formatted string? If
+        `False` but `n_overall` is specified, the result will include the
+        percentage value of `n` out of `n_overall`, but not `n_overall` itself.
+        Ignored if `n_overall` is not given.
     print_result : bool
-        Should the formatted string be printed? If `False`, the string is returned
-        without printing.
+        Should the formatted string be printed? If `False`, the string is
+        returned rather than printed.
 
     Returns
     -------
     str or None
-        If `print_result` is `False`, returns the formatted string. Otherwise, the
-        string is printed but not returned.
+        If `print_result` is `False`, returns the formatted string. Otherwise,
+        the string is printed but not returned.
     """
     if not isinstance(n, (int, float)):
         raise ValueError("'n' must be numeric")
@@ -82,7 +81,8 @@ def show_count(n,
     n_overall_fmt = "out of {:,}"
     ## If overall_description is given and show_n_overall is False,
     ## put the description in the parens together with the percentage.
-    ## Otherwise, it will be added separately, and 'descr' will be an empty string.
+    ## Otherwise, it will be added separately, and 'descr' will be
+    ## an empty string.
     pct_fmt = " ({pct:.2%}{descr})"
     overall_descr_fmt = " of {}"
 
@@ -107,7 +107,8 @@ def show_count(n,
             ## If an overall description is given, format and insert it
             ## into the parens next to the percentage.
             if overall_description:
-                overall_descr_str = overall_descr_fmt.format(overall_description)
+                overall_descr_str = overall_descr_fmt.\
+                    format(overall_description)
             else:
                 overall_descr_str = ""
             components.append(pct_fmt.format(pct=pct_of_overall,

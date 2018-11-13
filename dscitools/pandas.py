@@ -212,8 +212,9 @@ class FormattedDataFrame(DataFrame):
     def _is_df_like(df):
         """Check if an object is a 2D Pandas object (ie. a DataFrame).
 
-        This cannot be accomplished just by checking `isinstance(df, DataFrame)`
-        because of the use of utility classes like BlockManager.
+        This cannot be accomplished just by checking
+        `isinstance(df, DataFrame)` because of the use of utility classes like
+        BlockManager.
         """
         if not isinstance(df, PandasObject):
             return False
@@ -293,12 +294,11 @@ class FormattedDataFrame(DataFrame):
         ## If there are static formatters, warn if the DF has been modified
         ## in a way that might break the original formatting.
         if self._static_formatters and self._df_is_modified():
-            warnings.warn(
-                "The DF underlying this FormattedDataFrame instance" +
-                " appears to have changed, and requested formatting may" +
-                " no longer apply. It is recommended to create a new instance" +
-                " by calling `fmt_df()`."
-            )
+            modified_msg = "The DF underlying this FormattedDataFrame" + \
+                " instance appears to have changed, and requested " + \
+                " formatting may no longer apply. It is recommended to" + \
+                " create a new instance by calling `fmt_df()`."
+            warnings.warn(modified_msg)
 
         formatters = {}
         if self._dynamic_float:
@@ -336,7 +336,8 @@ class FormattedDataFrame(DataFrame):
             ## should be formatted as int (unless the column is all NaN).
             if _is_float_col(col):
                 col_nona = self[col].dropna()
-                if len(col_nona) > 0 and col_nona.apply(float.is_integer).all():
+                if (len(col_nona) > 0 and
+                        col_nona.apply(float.is_integer).all()):
                     return True
             return False
 
@@ -394,25 +395,25 @@ class FormattedDataFrame(DataFrame):
         return self._to_fmt_with_formatters("html", *args, **kwargs)
 
     def _int_formatter(self, col_name):
-        """Returns a format specifier string to be applied to int columns."""
+        """Returns the format specifier string applied to int columns."""
         precision = self._column_precision.get(col_name,
                                                self.INT_DEFAULT_PRECISION)
         return "{{: ,.{prec}f}}".format(prec=precision)
 
     def _float_formatter(self, col_name):
-        """Returns a format specifier string to be applied to float columns."""
+        """Returns the format specifier string applied to float columns."""
         precision = self._column_precision.get(col_name,
                                                self.FLOAT_DEFAULT_PRECISION)
         return "{{: ,.{prec}f}}".format(prec=precision)
 
     def _pct_formatter(self, col_name):
-        """Returns a format specifier string to be applied to percent columns."""
+        """Returns the format specifier string applied to percent columns."""
         precision = self._column_precision.get(col_name,
                                                self.PCT_DEFAULT_PRECISION)
         return "{{: ,.{prec}%}}".format(prec=precision)
 
     def _dollar_formatter(self, col_name):
-        """Returns a format specifier string to be applied to dollar columns."""
+        """Returns the format specifier string applied to dollar columns."""
         precision = self._column_precision.get(col_name,
                                                self.DOLLAR_DEFAULT_PRECISION)
         fmt_str = "{{: ,.{prec}f}}".format(prec=precision)
@@ -435,8 +436,8 @@ def _col_name_list(colname_arg):
     Parameters
     ----------
     colname_arg : str or list-like
-        The argument supplied to a column name parameter, either a single column
-        name or a list-like of column names.
+        The argument supplied to a column name parameter, either a single
+        column name or a list-like of column names.
 
     Returns
     -------

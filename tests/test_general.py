@@ -38,7 +38,7 @@ def test_show_count_with_description(count, description):
     assert (
         show_count(count,
                    description,
-                   print_result = False) ==
+                   print_result=False) ==
         "Number of items:  3,592"
     )
 
