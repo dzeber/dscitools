@@ -70,6 +70,227 @@ def fmt_df(df,
                               precision=precision)
 
 
+def fmt_count_df(df,
+                 n_overall=None,
+                 count_col=None,
+                 order_by_count=False,
+                 show_cum_pct=False,
+                 pct_col_name=None,
+                 fmt=True,
+                 pct_precision=2):
+    """Format a DataFrame for displaying group counts.
+
+    This is useful for presenting results or diagnostics in the form of a table
+    listing counts corresponding to groups or cases. Percentages corresponding
+    to the counts are appended, and numbers are formatted. The DF can
+    optionally be ordered by decreasing count and include cumulative
+    percentages down the rows. The original DF is not modified.
+
+    Any columns added to the DF are assigned default names unless overridden
+    using the `pct_col_name` parameter.
+
+    Parameters
+    ----------
+    df : DataFrame
+        A DataFrame containing counts to be formatted.
+    n_overall : numeric, str, or list-like, optional
+        The overall total (denominator) to use in computing percentages.
+        Supply:
+            - a number representing the total
+            - the name of a column containing individual row-wise totals. In
+              this case, the count column is divided element-wise by this
+              column.
+            - `None` (the default), indicating that the sum of the
+              corresponding count column is to be used
+        If multiple count columns are specified, this should be a list-like
+        containing an element corresponding to each count column, in the same
+        order, with elements as described above. In this case, a single `None`
+        is interpreted as using `None` for each count column.
+    count_col : str or list-like, optional
+        The count column(s) for which percentages should be computed:
+            - a single column name
+            - a list-like of column names
+            - `None` (the default), in which case any columns named "count",
+              "n", "num", or starting with "n_" or "num_" are used
+    order_by_count : bool, str or list-like, optional
+        Should the final DF be reordered by decreasing count? Supply:
+            - a boolean indicating whether the result should be reorded. If
+              `True`, the first count column is used for ordering.
+            - the name of a count column to order by.
+            - a list-list of count columns to order by, each in decreasing
+              order.
+    show_cum_pct : bool, str or list-like, optional
+        Should cumulative percentages (accumulating down the rows) be included
+        in the final table? This is done after reordering by decreasing count,
+        if required. Supply:
+            - the name of a count column, or a list-like of count column names,
+              to include cumulative percentages for
+            - a boolean indicating whether to include cumulative percentages.
+              If `True`, they are included for each count column.
+        Names for these columns are generated automatically. If the
+        corresponding `n_overall` for one of these is a column of totals rather
+        than a scalar, the cumulative percent column will be omitted.
+    pct_col_name : str or list-like, optional
+        The name(s) to use for the percentage column(s). Supply:
+            - the column name to use, if there is a single count columm.
+            - a list-like of column names, if there are multiple count columns.
+              In this case, the list should contain a name corresponding to
+              each count column, in the same order.
+        A single `None` or a `None` list element indicates that default naming
+        is to be used for that column.
+    fmt : bool
+        Should number formatting be applied? If `True`, the result is wrapped
+        in a `FormattedDataFrame`. Note that the percentage columns actually
+        contain proportions between 0 and 1, and are displayed as percentages
+        if `fmt` is `True`.
+    pct_precision : int, optional
+        The number of decimal places the formatted percentages should be
+        rounded to.
+
+    Returns
+    -------
+    FormattedDataFrame or DataFrame
+        A copy of `df` structured as described above, possibly with additional
+        columns. If `fmt` is `True`, it is wrapped in a `FormattedDataFrame`.
+    """
+    if not _is_df_like(df):
+        raise NotImplementedError("'df' must be a DataFrame")
+
+    if count_col is None:
+        ## Detect count columns.
+        def is_count_col(colname):
+            return (colname in ("count", "n", "num") or
+                    colname.startswith("n_") or
+                    colname.startswith("num_"))
+
+        count_col = [col for col in df.columns if is_count_col(col)]
+    else:
+        if not _is_str_or_list(count_col):
+            err_msg = "'count_col' must be either a string or list-like"
+            raise ValueError(err_msg)
+        count_col = _col_name_list(count_col)
+        for col in count_col:
+            if col not in df.columns:
+                err_msg = "Count column '{}' was not found in the DataFrame"
+                raise ValueError(err_msg.format(col))
+    if len(count_col) > len(set(count_col)):
+        raise NotImplementedError("Cannot handle repeated count column names")
+
+    if n_overall is None:
+        n_overall = [None] * len(count_col)
+    elif not is_list_like(n_overall):
+        n_overall = [n_overall]
+    if len(n_overall) != len(count_col):
+        err_msg = "If specified, there must be as many `n_overall` values" + \
+                  " as count columns"
+        raise ValueError(err_msg)
+
+    if pct_col_name is None:
+        pct_col_name = [None] * len(count_col)
+    elif not is_list_like(pct_col_name):
+        pct_col_name = [pct_col_name]
+    if len(pct_col_name) != len(count_col):
+        err_msg = "If specified, there must be as many `pct_col_name`" + \
+                  " values as count columns"
+        raise ValueError(err_msg)
+
+    order_cols = []
+    if isinstance(order_by_count, bool):
+        if order_by_count:
+            order_cols.append(count_col[0])
+    else:
+        ## Fail silently if these are not valid count column names.
+        order_by_count = _col_name_list(order_by_count)
+        for col in order_by_count:
+            if col in count_col:
+                order_cols.append(col)
+
+    cum_pct_col_names = []
+    if isinstance(show_cum_pct, bool):
+        if show_cum_pct:
+            cum_pct_col_names = count_col
+    else:
+        ## Fail silently if these are not valid count column names.
+        show_cum_pct = _col_name_list(show_cum_pct)
+        for col in show_cum_pct:
+            if col in count_col:
+                cum_pct_col_names.append(col)
+
+    pct_df = df.copy()
+    if order_cols:
+        pct_df.sort_values(order_cols, ascending=False, inplace=True)
+
+    ## This will be a list of (<pct column name>, <computed pct column>).
+    pct_cols = []
+    ## This will a similar list for cumulative pct columns.
+    cum_pct_cols = []
+    for i, col in enumerate(count_col):
+        denom = n_overall[i]
+        if denom is None:
+            denom = df[col].sum()
+            pct = df[col] / denom
+        elif isinstance(denom, (int, float)):
+            pct = df[col] / denom
+        else:
+            denom = str(denom)
+            if denom not in df.columns:
+                err_msg = "Totals ('n_overall') column '{}' was not found" + \
+                          "in the DataFrame"
+                raise ValueError(err_msg.format(denom))
+            pct = df[col] / df[denom]
+
+        if pct_col_name[i] is None:
+            ## Generate a default name for the percentage column.
+            def prop_col_name(col):
+                if col == "count":
+                    return "proportion"
+                if col == "n":
+                    return "p"
+                if col == "num":
+                    return "prop"
+                if col.startswith("n_"):
+                    return "p_" + col[2:]
+                if col.startswith("num_"):
+                    return "prop_" + col[4:]
+                return "prop_" + col
+
+            pct_colname = prop_col_name(col)
+        else:
+            pct_colname = str(pct_col_name[i])
+
+        pct_cols.append((pct_colname, pct))
+
+        ## Omit cumulative percent columns for which n_overall is not scalar.
+        if col in cum_pct_col_names and not isinstance(denom, str):
+            cumpct = df[col].cumsum() / denom
+            cumpct_colname = "cum " + pct_colname
+            cum_pct_cols.append((cumpct_colname, cumpct))
+
+    all_pct_cols = []
+    for colname, col in pct_cols:
+        if colname in pct_df.columns:
+            err_msg = "Attempting to add percent column '{}', but a column" + \
+                      " with this name is already in the DataFrame"
+            raise ValueError(err_msg.format(colname))
+        pct_df[colname] = col
+        all_pct_cols.append(colname)
+    for colname, col in cum_pct_cols:
+        if colname in pct_df.columns:
+            err_msg = "Attempting to add cumulative percent column '{}'," + \
+                      " but a column with this name is already in the" + \
+                      " DataFrame"
+            raise ValueError(err_msg.format(colname))
+        pct_df[colname] = col
+        all_pct_cols.append(colname)
+
+    if fmt:
+        precision_arg = {col: pct_precision for col in all_pct_cols}
+        pct_df = FormattedDataFrame(pct_df,
+                                    fmt_percent=all_pct_cols,
+                                    precision=precision_arg)
+    return pct_df
+
+
 class FormattedDataFrame(DataFrame):
     """A wrapper for a Pandas DataFrame that renders with custom formatting.
 
@@ -140,8 +361,8 @@ class FormattedDataFrame(DataFrame):
                  fmt_percent=None,
                  fmt_dollar=None,
                  precision=None):
-        if not self._is_df_like(df):
-            raise ValueError("'df' must be a DataFrame")
+        if not _is_df_like(df):
+            raise NotImplementedError("'df' must be a DataFrame")
         super(FormattedDataFrame, self).__init__(data=df, copy=False)
 
         ## Cache the parameters passed to __init__ for use in the
@@ -207,21 +428,6 @@ class FormattedDataFrame(DataFrame):
 
         ## Convert the format strings to formatting functions.
         self._static_formatters = self._ensure_fmt_funcs(formatters)
-
-    @staticmethod
-    def _is_df_like(df):
-        """Check if an object is a 2D Pandas object (ie. a DataFrame).
-
-        This cannot be accomplished just by checking
-        `isinstance(df, DataFrame)` because of the use of utility classes like
-        BlockManager.
-        """
-        if not isinstance(df, PandasObject):
-            return False
-        try:
-            return df.ndim == 2
-        except AttributeError:
-            return False
 
     def _get_signature(self):
         """Generate a signature used to check for modifications to the DF."""
@@ -430,6 +636,25 @@ class FormattedDataFrame(DataFrame):
         return fmt_val
 
 
+def _is_df_like(df):
+    """Check if an object is a 2D Pandas object (ie. a DataFrame).
+
+    This cannot be accomplished just by checking `isinstance(df, DataFrame)`
+    because of the use of utility classes like BlockManager.
+    """
+    if not isinstance(df, PandasObject):
+        return False
+    try:
+        return df.ndim == 2
+    except AttributeError:
+        return False
+
+
+def _is_str_or_list(val):
+    """Check whether the argument is either a string or list-like."""
+    return isinstance(val, str) or is_list_like(val)
+
+
 def _col_name_list(colname_arg):
     """Ensure supplied column names are represented as a list or tuple.
 
@@ -450,6 +675,6 @@ def _col_name_list(colname_arg):
         if isinstance(colname_arg, str):
             return [colname_arg]
         if is_list_like(colname_arg):
-            return list(colname_arg)
+            return [str(col) for col in colname_arg]
     return []
 
