@@ -666,10 +666,10 @@ def _col_name_list(colname_arg):
 
     Returns
     -------
-    list
+    list of str
         If `colname_arg` is a single string, returns a list containing it as a
-        single element. Otherwise returns arg as a list. If anything else,
-        returns an empty list.
+        single element. Otherwise returns arg as a list, with elements
+        converted to strings. If anything else, returns an empty list.
     """
     if colname_arg:
         if isinstance(colname_arg, str):
