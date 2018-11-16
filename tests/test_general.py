@@ -26,7 +26,8 @@ def overall_description():
 @pytest.fixture
 def np_data(count, overall_total):
     return nparray([count, overall_total - count],
-                    dtype="int64")
+                   dtype="int64")
+
 
 @pytest.fixture
 def float_count():
