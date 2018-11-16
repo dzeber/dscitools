@@ -2,6 +2,7 @@
 General utilities.
 """
 
+from __future__ import division
 import datetime
 
 
@@ -67,14 +68,6 @@ def fmt_count(n,
         If `print_result` is `False`, returns the formatted string. Otherwise,
         the string is printed but not returned.
     """
-    if not isinstance(n, (int, float)):
-        raise ValueError("'n' must be numeric")
-    if n_overall is not None:
-        if not isinstance(n_overall, (int, float)):
-            raise ValueError("'n_overall' must be numeric")
-        if n_overall == 0:
-            raise ValueError("'n_overall' must not be 0")
-
     ## No rounding is currently done if n is not an integer.
     n_fmt = "{:,}"
     descr_fmt = "{}: "
@@ -94,6 +87,7 @@ def fmt_count(n,
     if n_overall:
         ## The percentage will get shown regardless of whether show_n_overall
         ## is True or False.
+        ## Note: if n_overall is 0, the percentage calculation is not attempted.
         pct_of_overall = n / n_overall
         if show_n_overall:
             components.append(n_overall_fmt.format(n_overall))
@@ -114,7 +108,8 @@ def fmt_count(n,
             components.append(pct_fmt.format(pct=pct_of_overall,
                                              descr=overall_descr_str))
     formatted_str = " ".join(components)
-    if not print_result:
+    if print_result:
+        print(formatted_str)
+    else:
         return formatted_str
-    print(formatted_str)
 
