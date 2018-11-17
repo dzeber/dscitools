@@ -2,17 +2,20 @@
 Utilities for working with Pandas DataFrames.
 """
 
+from __future__ import division, absolute_import
+import inspect
+import warnings
+
 from pandas import DataFrame
 from pandas import isna
-from pandas.core.base import PandasObject
 from pandas.api.types import (
     is_list_like,
     is_integer_dtype,
     is_float_dtype
 )
+from numpy import isscalar
 
-import inspect
-import warnings
+from .common import to_str, is_str
 
 
 ## Simple warning message formatting.
@@ -153,9 +156,6 @@ def fmt_count_df(df,
         A copy of `df` structured as described above, possibly with additional
         columns. If `fmt` is `True`, it is wrapped in a `FormattedDataFrame`.
     """
-    if not _is_df_like(df):
-        raise NotImplementedError("'df' must be a DataFrame")
-
     if count_col is None:
         ## Detect count columns.
         def is_count_col(colname):
@@ -165,16 +165,15 @@ def fmt_count_df(df,
 
         count_col = [col for col in df.columns if is_count_col(col)]
     else:
-        if not _is_str_or_list(count_col):
-            err_msg = "'count_col' must be either a string or list-like"
-            raise ValueError(err_msg)
         count_col = _col_name_list(count_col)
         for col in count_col:
             if col not in df.columns:
                 err_msg = "Count column '{}' was not found in the DataFrame"
                 raise ValueError(err_msg.format(col))
     if len(count_col) > len(set(count_col)):
-        raise NotImplementedError("Cannot handle repeated count column names")
+        ## This will cause a problem matching against other params by index.
+        ## Rather than just dropping duplicate column names, throw an error.
+        raise ValueError("Cannot handle repeated count column names")
 
     if n_overall is None:
         n_overall = [None] * len(count_col)
@@ -195,9 +194,8 @@ def fmt_count_df(df,
         raise ValueError(err_msg)
 
     order_cols = []
-    if isinstance(order_by_count, bool):
-        if order_by_count:
-            order_cols.append(count_col[0])
+    if order_by_count == True:
+        order_cols.append(count_col[0])
     else:
         ## Fail silently if these are not valid count column names.
         order_by_count = _col_name_list(order_by_count)
@@ -206,9 +204,8 @@ def fmt_count_df(df,
                 order_cols.append(col)
 
     cum_pct_col_names = []
-    if isinstance(show_cum_pct, bool):
-        if show_cum_pct:
-            cum_pct_col_names = count_col
+    if show_cum_pct == True:
+        cum_pct_col_names = count_col
     else:
         ## Fail silently if these are not valid count column names.
         show_cum_pct = _col_name_list(show_cum_pct)
@@ -228,16 +225,14 @@ def fmt_count_df(df,
         denom = n_overall[i]
         if denom is None:
             denom = df[col].sum()
-            pct = df[col] / denom
-        elif isinstance(denom, (int, float)):
-            pct = df[col] / denom
-        else:
-            denom = str(denom)
+        elif is_str(denom):
+            ## Interpret as a column name.
             if denom not in df.columns:
                 err_msg = "Totals ('n_overall') column '{}' was not found" + \
                           "in the DataFrame"
                 raise ValueError(err_msg.format(denom))
-            pct = df[col] / df[denom]
+            denom = df[denom]
+        pct = df[col] / denom
 
         if pct_col_name[i] is None:
             ## Generate a default name for the percentage column.
@@ -256,12 +251,12 @@ def fmt_count_df(df,
 
             pct_colname = prop_col_name(col)
         else:
-            pct_colname = str(pct_col_name[i])
+            pct_colname = to_str(pct_col_name[i])
 
         pct_cols.append((pct_colname, pct))
 
         ## Omit cumulative percent columns for which n_overall is not scalar.
-        if col in cum_pct_col_names and not isinstance(denom, str):
+        if col in cum_pct_col_names and isscalar(denom):
             cumpct = df[col].cumsum() / denom
             cumpct_colname = "cum " + pct_colname
             cum_pct_cols.append((cumpct_colname, cumpct))
@@ -361,8 +356,6 @@ class FormattedDataFrame(DataFrame):
                  fmt_percent=None,
                  fmt_dollar=None,
                  precision=None):
-        if not _is_df_like(df):
-            raise NotImplementedError("'df' must be a DataFrame")
         super(FormattedDataFrame, self).__init__(data=df, copy=False)
 
         ## Cache the parameters passed to __init__ for use in the
@@ -378,10 +371,17 @@ class FormattedDataFrame(DataFrame):
         ## Cache the structure of the original DF to check for modification.
         self._signature = self._get_signature()
 
-        if isinstance(precision, dict):
-            for v in precision.values():
-                if not isinstance(v, int):
-                    raise ValueError("All column precision values must be int")
+        if precision or precision == 0:
+            ## Explicitly include numeric 0 in type check
+            try:
+                precision = dict(precision)
+            except TypeError:
+                raise ValueError("If given, 'precision' must be a dict")
+            try:
+                for col in precision:
+                    precision[col] = int(precision[col])
+            except (TypeError, ValueError):
+                raise ValueError("Precision values must be integers")
             self._column_precision = precision
         else:
             self._column_precision = {}
@@ -391,7 +391,7 @@ class FormattedDataFrame(DataFrame):
         ## attribute already being set above.
         formatters = {}
 
-        def check_repeated_col(col, fmts):
+        def ensure_col_not_repeated(col, fmts):
             ## Check whether the given column already has formatting associated
             ## with it.
             if col in fmts:
@@ -400,30 +400,32 @@ class FormattedDataFrame(DataFrame):
                 raise ValueError(msg.format(col))
 
         self._dynamic_int = False
-        if isinstance(fmt_int, bool) and fmt_int:
+        if fmt_int == True:
+            ## Check for an explicit boolean value.
             self._dynamic_int = True
         else:
             int_cols = _col_name_list(fmt_int)
             for colname in int_cols:
-                check_repeated_col(colname, formatters)
+                ensure_col_not_repeated(colname, formatters)
                 formatters[colname] = self._int_formatter(colname)
 
         self._dynamic_float = False
-        if isinstance(fmt_float, bool) and fmt_float:
+        if fmt_float == True:
+            ## Check for an explicit boolean value.
             self._dynamic_float = True
         else:
             float_cols = _col_name_list(fmt_float)
             for colname in float_cols:
-                check_repeated_col(colname, formatters)
+                ensure_col_not_repeated(colname, formatters)
                 formatters[colname] = self._float_formatter(colname)
 
         pct_cols = _col_name_list(fmt_percent)
         for colname in pct_cols:
-            check_repeated_col(colname, formatters)
+            ensure_col_not_repeated(colname, formatters)
             formatters[colname] = self._pct_formatter(colname)
         dollar_cols = _col_name_list(fmt_dollar)
         for colname in dollar_cols:
-            check_repeated_col(colname, formatters)
+            ensure_col_not_repeated(colname, formatters)
             formatters[colname] = self._dollar_formatter(colname)
 
         ## Convert the format strings to formatting functions.
@@ -459,7 +461,7 @@ class FormattedDataFrame(DataFrame):
             return fmt_num
 
         def ensure_fmt_func(fmtter):
-            if isinstance(fmtter, str):
+            if is_str(fmtter):
                 return fmt_func(fmtter)
             return fmtter
 
@@ -575,9 +577,23 @@ class FormattedDataFrame(DataFrame):
         ## of the overriden method.
         fmt_func = "to_{}".format(fmt)
         super_method = getattr(super(FormattedDataFrame, self), fmt_func)
-        super_method_sig = inspect.signature(super_method)
-        super_bound_args = super_method_sig.bind(*args, **kwargs).arguments
-        supplied_fmt = super_bound_args.get("formatters", {})
+        try:
+            super_method_sig = inspect.signature(super_method)
+            super_bound_args = super_method_sig.bind(*args, **kwargs).arguments
+        except AttributeError:
+            ## Compat with Python < 3.5
+            super_bound_args = inspect.getcallargs(super_method,
+                                                   *args,
+                                                   **kwargs)
+            del super_bound_args["self"]
+        supplied_fmt = super_bound_args.get("formatters")
+        if not supplied_fmt:
+            ## Compat:
+            ## With signature(), if the 'formatters' arg is not supplied,
+            ## it will not be in super_bound_args.
+            ## With getcallargs(), it will have an entry in super_bound_args
+            ## with value None.
+            supplied_fmt = {}
         ## If supplied, the formatting arg could be either
         ## a list of length equal to the number of columns or a dict.
         ## If a list, this means a formatter is specified for each column.
@@ -636,25 +652,6 @@ class FormattedDataFrame(DataFrame):
         return fmt_val
 
 
-def _is_df_like(df):
-    """Check if an object is a 2D Pandas object (ie. a DataFrame).
-
-    This cannot be accomplished just by checking `isinstance(df, DataFrame)`
-    because of the use of utility classes like BlockManager.
-    """
-    if not isinstance(df, PandasObject):
-        return False
-    try:
-        return df.ndim == 2
-    except AttributeError:
-        return False
-
-
-def _is_str_or_list(val):
-    """Check whether the argument is either a string or list-like."""
-    return isinstance(val, str) or is_list_like(val)
-
-
 def _col_name_list(colname_arg):
     """Ensure supplied column names are represented as a list or tuple.
 
@@ -667,14 +664,13 @@ def _col_name_list(colname_arg):
     Returns
     -------
     list of str
-        If `colname_arg` is a single string, returns a list containing it as a
-        single element. Otherwise returns arg as a list, with elements
-        converted to strings. If anything else, returns an empty list.
+        If `colname_arg` is a scalar value, returns a list containing it as a
+        single string. Otherwise returns arg, ensuring elements are strings.
+        If arg is falsey, returns an empty list.
     """
-    if colname_arg:
-        if isinstance(colname_arg, str):
-            return [colname_arg]
-        if is_list_like(colname_arg):
-            return [str(col) for col in colname_arg]
-    return []
+    if not colname_arg:
+        return []
+    if is_list_like(colname_arg):
+        return [to_str(col) for col in colname_arg]
+    return [to_str(colname_arg)]
 
