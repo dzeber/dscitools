@@ -120,7 +120,7 @@ def fmt_count_df(df,
             - a boolean indicating whether the result should be reorded. If
               `True`, the first count column is used for ordering.
             - the name of a count column to order by.
-            - a list-list of count columns to order by, each in decreasing
+            - a list-like of count columns to order by, each in decreasing
               order.
     show_cum_pct : bool, str or list-like, optional
         Should cumulative percentages (accumulating down the rows) be included
