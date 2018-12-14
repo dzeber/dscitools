@@ -53,12 +53,12 @@ def fmt_count(n,
         Description of what the overall total `n_overall` represents. This is
         useful if `n` is some specific subset out of a more general overall
         group. Ignored if `n_overall` is not given.
-    show_n_overall : bool
+    show_n_overall : bool, optional
         Should the overall total be included in the formatted string? If
         `False` but `n_overall` is specified, the result will include the
         percentage value of `n` out of `n_overall`, but not `n_overall` itself.
         Ignored if `n_overall` is not given.
-    print_result : bool
+    print_result : bool, optional
         Should the formatted string be printed? If `False`, the string is
         returned rather than printed.
 
