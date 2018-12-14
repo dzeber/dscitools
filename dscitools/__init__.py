@@ -14,3 +14,10 @@ from .ipython import (
     print_status,
     print_assertion
 )
+from .new.spark import (
+    show_df,
+    renew_cache,
+    count_distinct,
+    dump_to_csv,
+    get_colname
+)
