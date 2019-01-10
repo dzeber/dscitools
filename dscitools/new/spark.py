@@ -35,7 +35,5 @@ def dump_to_csv(df, path, write_mode=None, num_parts=1, compress=True):
                    mode=write_mode,
                    compression="gzip" if compress else None,
                    header=True,
-                   nullValue="",
-                   emptyValue="",
-                   encoding="utf-8")
+                   nullValue="")
 
