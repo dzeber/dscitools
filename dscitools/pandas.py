@@ -23,6 +23,7 @@ def _simple_warn(msg, category=UserWarning, *args, **kwargs):
     """Show a simple warning of the form <type>: <warning message>."""
     print("{categ}: {msg}".format(categ=category.__name__, msg=msg))
 
+
 warnings.showwarning = _simple_warn
 
 
@@ -194,7 +195,7 @@ def fmt_count_df(df,
         raise ValueError(err_msg)
 
     order_cols = []
-    if order_by_count == True:
+    if order_by_count == True:              # noqa: E712
         order_cols.append(count_col[0])
     else:
         ## Fail silently if these are not valid count column names.
@@ -204,7 +205,7 @@ def fmt_count_df(df,
                 order_cols.append(col)
 
     cum_pct_col_names = []
-    if show_cum_pct == True:
+    if show_cum_pct == True:                # noqa: E712
         cum_pct_col_names = count_col
     else:
         ## Fail silently if these are not valid count column names.
@@ -400,7 +401,8 @@ class FormattedDataFrame(DataFrame):
                 raise ValueError(msg.format(col))
 
         self._dynamic_int = False
-        if fmt_int == True:
+        if fmt_int == True:                 # noqa: E712
+
             ## Check for an explicit boolean value.
             self._dynamic_int = True
         else:
@@ -410,7 +412,7 @@ class FormattedDataFrame(DataFrame):
                 formatters[colname] = self._int_formatter(colname)
 
         self._dynamic_float = False
-        if fmt_float == True:
+        if fmt_float == True:               # noqa: E712
             ## Check for an explicit boolean value.
             self._dynamic_float = True
         else:
@@ -673,4 +675,3 @@ def _col_name_list(colname_arg):
     if is_list_like(colname_arg):
         return [to_str(col) for col in colname_arg]
     return [to_str(colname_arg)]
-

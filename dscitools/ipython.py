@@ -155,4 +155,3 @@ class AssertMessage(MarkdownMessage):
     def __init__(self, message, result):
         self._message = self.MESSAGE_TEMPLATE.format(msg=message,
                                                      result=result)
-

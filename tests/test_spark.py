@@ -81,4 +81,3 @@ def test_count_distinct(spark_df):
     df_a = spark_df.where("label = 'a'")
     assert count_distinct(df_a) == 3
     assert count_distinct(df_a, "label") == 1
-

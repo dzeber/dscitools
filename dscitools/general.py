@@ -112,4 +112,3 @@ def fmt_count(n,
         print(formatted_str)
     else:
         return formatted_str
-

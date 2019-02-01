@@ -88,4 +88,3 @@ def get_colname(col):
     ## Column object.
     ## This mirrors what Column.__repr__ does.
     return col._jc.toString()
-

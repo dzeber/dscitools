@@ -145,4 +145,3 @@ def test_fmt_count_with_floats(float_count, description, float_overall_total):
                   print_result=False) ==
         "Number of items:  27.82 out of 146.3  (19.02%)"
     )
-
