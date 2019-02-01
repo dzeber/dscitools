@@ -10,6 +10,10 @@ from dscitools.spark import (
     get_colname,
     count_distinct
 )
+### FIXME
+from dscitools.new.spark import (
+    dump_to_csv
+)
 
 
 @pytest.fixture(scope="module")
@@ -41,6 +45,34 @@ def pandas_df():
 @pytest.fixture
 def spark_df(spark, pandas_df):
     return spark.createDataFrame(pandas_df)
+
+
+@pytest.fixture
+def csv_rows():
+    return [
+        "label,value",
+        "a,1",
+        "a,2",
+        "a,3",
+        "b,4",
+        "b,5",
+        "b,1",
+        "c,2",
+        "c,3"
+    ]    
+
+
+def compare_csv(observed_csv_file, expected_rows):
+    """Compare a CSV file written by Spark against the expected rows.
+
+    Spark may not write rows in the original order. The file is as expected if
+    the headers match and the same rows are present.
+    """
+    with open(observed_csv_file) as f:
+        observed_rows = f.readlines()
+    ## Compare headers.
+    assert observed_rows[0] == expected_rows[0]
+    assert set(observed_rows[1:]) == set(expected_rows[1:])
 
 
 def test_show_df(spark_df, pandas_df):
@@ -81,3 +113,17 @@ def test_count_distinct(spark_df):
     df_a = spark_df.where("label = 'a'")
     assert count_distinct(df_a) == 3
     assert count_distinct(df_a, "label") == 1
+
+
+def test_dump_to_csv(spark_df, tmpdir, csv_rows):
+    ## Set up mock bucket using boto3 & moto
+    ## use the API to write the DF to the bucket
+    ## download the file and compare
+    df_path = str(tmpdir.join("df"))
+    dump_to_csv(spark_df, df_path, compress=False)
+    compare_csv(df_path, csv_rows)
+    ## Test:
+    ## - writing with compression
+    ## - writing with multiple parts
+    ## - writing with column partitioning
+    ## - write mode
