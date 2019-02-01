@@ -6,6 +6,20 @@ from io import open
 with open("README.md", encoding='utf-8') as f:
     long_description = f.read()
 
+test_deps = [
+    "pytest>=3.1",
+    "pytest-cov",
+    "pyspark",
+    "nbformat",
+    "nbconvert",
+    "ipykernel",
+    "jupyter_client"
+]
+
+extras = {
+    "testing": test_deps
+}
+
 setup(
     name="dscitools",
     version="0.1.0",
@@ -37,8 +51,6 @@ setup(
         "pandas",
         "six"
     ],
-    tests_require=[
-        "pytest",
-        "pyspark"
-    ]
+    tests_require=test_deps,
+    extras_require=extras
 )
