@@ -1,37 +1,36 @@
 import pytest
 from pandas import DataFrame
 from pandas.util.testing import assert_frame_equal
-
+import gzip
 from pyspark.sql import SparkSession
+from pyspark.sql.utils import AnalysisException
 
 from dscitools.spark import (
     show_df,
     renew_cache,
     get_colname,
-    count_distinct
-)
-### FIXME
-from dscitools.new.spark import (
+    count_distinct,
     dump_to_csv
 )
 
 
 @pytest.fixture(scope="module")
 def spark():
-    spark = SparkSession\
-        .builder\
-        .master("local")\
-        .appName("dscitools_test")\
+    spark = (
+        SparkSession
+        .builder
+        .master("local")
+        .appName("dscitools_test")
+        ## Requirement to get Spark to work with S3.
+        #.config("spark.jars.packages",
+        #        "org.apache.hadoop:hadoop-aws:2.7.3")
         .getOrCreate()
+    )
+
     yield spark
 
     ## Teardown
     spark.stop()
-
-
-#@pytest.fixture(scope="module")
-#def spark_context(spark):
-#    return spark.sparkContext
 
 
 @pytest.fixture
@@ -59,20 +58,7 @@ def csv_rows():
         "b,1",
         "c,2",
         "c,3"
-    ]    
-
-
-def compare_csv(observed_csv_file, expected_rows):
-    """Compare a CSV file written by Spark against the expected rows.
-
-    Spark may not write rows in the original order. The file is as expected if
-    the headers match and the same rows are present.
-    """
-    with open(observed_csv_file) as f:
-        observed_rows = f.readlines()
-    ## Compare headers.
-    assert observed_rows[0] == expected_rows[0]
-    assert set(observed_rows[1:]) == set(expected_rows[1:])
+    ]
 
 
 def test_show_df(spark_df, pandas_df):
@@ -115,15 +101,86 @@ def test_count_distinct(spark_df):
     assert count_distinct(df_a, "label") == 1
 
 
-def test_dump_to_csv(spark_df, tmpdir, csv_rows):
-    ## Set up mock bucket using boto3 & moto
-    ## use the API to write the DF to the bucket
-    ## download the file and compare
-    df_path = str(tmpdir.join("df"))
-    dump_to_csv(spark_df, df_path, compress=False)
-    compare_csv(df_path, csv_rows)
-    ## Test:
-    ## - writing with compression
-    ## - writing with multiple parts
-    ## - writing with column partitioning
-    ## - write mode
+def compare_csv(observed_csv_files, expected_rows):
+    """Compare a CSV file or files written by Spark against the expected rows.
+
+    Spark may not write rows in the original order. The file is as expected if
+    the headers match and the same rows are present.
+    """
+    if not isinstance(observed_csv_files, (list, tuple)):
+        observed_csv_files = [observed_csv_files]
+    observed_csv_files = [str(f) for f in observed_csv_files]
+
+    header_rows = []
+    data_rows = []
+
+    def read_csv_rows(fname):
+        """Read a CSV file that is possibly gzipped."""
+        if fname.endswith(".gz"):
+            with gzip.open(fname) as f:
+                contents = f.read().decode("utf-8")
+                return contents.split()
+        else:
+            with open(fname) as f:
+                rows = f.readlines()
+                return [r.rstrip("\n") for r in rows]
+
+    for fname in observed_csv_files:
+        observed_rows = read_csv_rows(fname)
+        header_rows.append(observed_rows.pop(0))
+        data_rows.extend(observed_rows)
+    ## Compare headers.
+    ## They should all be the same as the main table header.
+    header = set(header_rows)
+    assert len(header) == 1
+    assert header.pop() == expected_rows[0]
+    ## Compare main rows.
+    assert set(data_rows) == set(expected_rows[1:])
+
+
+def test_dump_to_csv(spark_df, csv_rows, tmp_path):
+    ## It would be best to also test writing to S3. However, it is difficult
+    ## to mock because of AWS/Spark configuration issues.
+    ## For now, we only test locally. Files written to S3 should have
+    ## the same contents.
+
+    ## Single-part, uncompressed.
+    df_path = tmp_path.joinpath("df")
+    dump_to_csv(spark_df, str(df_path), compress=False)
+    ## There should be a single CSV with a machine-generated name.
+    csv_files = list(df_path.glob("*.csv"))
+    assert len(csv_files) == 1
+    compare_csv(csv_files, csv_rows)
+
+    ## Multiple part files.
+    df_path = tmp_path.joinpath("df2")
+    dump_to_csv(spark_df, str(df_path), num_parts=4, compress=False)
+    ## There should be 4 CSVs.
+    csv_files = list(df_path.glob("*.csv"))
+    assert len(csv_files) == 4
+    compare_csv(csv_files, csv_rows)
+
+    ## Single-part, compressed.
+    df_path = tmp_path.joinpath("df3")
+    dump_to_csv(spark_df, str(df_path), compress=True)
+    ## There should be a single gzipped CSV with a machine-generated name.
+    csv_files = list(df_path.glob("*.csv.gz"))
+    assert len(csv_files) == 1
+    compare_csv(csv_files, csv_rows)
+
+    ## Write mode is just the one used by Spark's DataFrameWriter.
+    ## Just test that the default throws an error on overwrite, and that
+    ## overwriting works as expected.
+    df_path = tmp_path.joinpath("df4")
+    dump_to_csv(spark_df, str(df_path), compress=False)
+    with pytest.raises(AnalysisException):
+        dump_to_csv(spark_df, str(df_path), compress=False)
+
+    dump_to_csv(spark_df.where("label = 'a'"),
+                str(df_path),
+                write_mode="overwrite",
+                compress=False)
+    csv_files = list(df_path.glob("*.csv"))
+    assert len(csv_files) == 1
+    a_rows = [r for i, r in enumerate(csv_rows) if i == 0 or r.startswith("a,")]
+    compare_csv(csv_files, a_rows)

@@ -18,9 +18,6 @@ from .spark import (
     show_df,
     renew_cache,
     count_distinct,
+    dump_to_csv,
     get_colname
-)
-## Temporary module
-from .new.spark import (
-    dump_to_csv
 )
