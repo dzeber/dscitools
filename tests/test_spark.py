@@ -2,6 +2,7 @@ import pytest
 from pandas import DataFrame
 from pandas.util.testing import assert_frame_equal
 import gzip
+import shutil
 from pyspark.sql import SparkSession
 from pyspark.sql.utils import AnalysisException
 
@@ -143,10 +144,12 @@ def test_dump_to_csv(spark_df, csv_rows, tmp_path):
     ## to mock because of AWS/Spark configuration issues.
     ## For now, we only test locally. Files written to S3 should have
     ## the same contents.
+    def dump(path, **kwargs):
+        dump_to_csv(spark_df, str(path), simplify=False, **kwargs)
 
     ## Single-part, uncompressed.
     df_path = tmp_path.joinpath("df")
-    dump_to_csv(spark_df, str(df_path), compress=False)
+    dump(df_path, compress=False)
     ## There should be a single CSV with a machine-generated name.
     csv_files = list(df_path.glob("*.csv"))
     assert len(csv_files) == 1
@@ -154,7 +157,7 @@ def test_dump_to_csv(spark_df, csv_rows, tmp_path):
 
     ## Multiple part files.
     df_path = tmp_path.joinpath("df2")
-    dump_to_csv(spark_df, str(df_path), num_parts=4, compress=False)
+    dump(df_path, num_parts=4, compress=False)
     ## There should be 4 CSVs.
     csv_files = list(df_path.glob("*.csv"))
     assert len(csv_files) == 4
@@ -162,7 +165,7 @@ def test_dump_to_csv(spark_df, csv_rows, tmp_path):
 
     ## Single-part, compressed.
     df_path = tmp_path.joinpath("df3")
-    dump_to_csv(spark_df, str(df_path), compress=True)
+    dump(df_path, compress=True)
     ## There should be a single gzipped CSV with a machine-generated name.
     csv_files = list(df_path.glob("*.csv.gz"))
     assert len(csv_files) == 1
@@ -172,15 +175,160 @@ def test_dump_to_csv(spark_df, csv_rows, tmp_path):
     ## Just test that the default throws an error on overwrite, and that
     ## overwriting works as expected.
     df_path = tmp_path.joinpath("df4")
-    dump_to_csv(spark_df, str(df_path), compress=False)
+    dump(df_path, compress=False)
     with pytest.raises(AnalysisException):
-        dump_to_csv(spark_df, str(df_path), compress=False)
+        dump(df_path, compress=False)
 
     dump_to_csv(spark_df.where("label = 'a'"),
                 str(df_path),
                 write_mode="overwrite",
-                compress=False)
+                compress=False,
+                simplify=False)
     csv_files = list(df_path.glob("*.csv"))
     assert len(csv_files) == 1
     a_rows = [r for i, r in enumerate(csv_rows) if i == 0 or r.startswith("a,")]
     compare_csv(csv_files, a_rows)
+
+
+def dir_contains(contents, files):
+    """Verify that a dir contains specific files."""
+    contents = [p.name for p in contents]
+    return set(contents) == set(files)
+
+
+def test_simplify_local(spark_df, csv_rows, tmp_path, capsys):
+    def dump(path, **kwargs):
+        dump_to_csv(spark_df, str(path), simplify=True, **kwargs)
+
+    def verify_single(out_path, prior_msg=""):
+        assert (
+            capsys.readouterr().out ==
+            prior_msg + "CSV output was written to {}.\n".format(out_path)
+        )
+        assert out_path.is_file()
+        compare_csv(out_path, csv_rows)
+
+    def verify_multiple(out_path, expected_files):
+        assert (
+            capsys.readouterr().out ==
+            "CSV output was written to {} across files {} to {}.\n".format(
+                out_path,
+                expected_files[0],
+                expected_files[-1]
+            )
+        )
+        assert out_path.is_dir()
+        csvs = [p for p in out_path.glob("*") if p.name in expected_files]
+        compare_csv(csvs, csv_rows)
+
+    ## Single part file.
+    df_path = tmp_path.joinpath("df1")
+    dump(df_path, compress=False)
+    new_df_path = tmp_path.joinpath("df1.csv")
+    verify_single(new_df_path)
+
+    ## When the new filename already exists.
+    dump(df_path, compress=False)
+    verify_single(df_path,
+                  "Target file {} already exists.\n".format(new_df_path))
+
+    ## When the output dirname has the extension.
+    df_path = tmp_path.joinpath("df2.csv")
+    dump(df_path, compress=False)
+    new_df_path = tmp_path.joinpath("df2.csv")
+    verify_single(new_df_path)
+
+    ## Compressed.
+    df_path = tmp_path.joinpath("df3")
+    dump(df_path, compress=True)
+    new_df_path = tmp_path.joinpath("df3.csv.gz")
+    verify_single(new_df_path)
+
+    ## When the new filename already exists.
+    dump(df_path, compress=True)
+    assert (
+        capsys.readouterr().out ==
+        "Target file {} already exists.\n".format(new_df_path) +
+        "Gzipped CSV output was written to {}.\n".format(df_path)
+    )
+    assert df_path.is_file()
+    ## Append the gzip extension so that it can be opened.
+    gz_path = df_path.with_suffix(".gz")
+    df_path.rename(gz_path)
+    compare_csv(gz_path, csv_rows)
+
+    ## When the output dirname has the extension.
+    df_path = tmp_path.joinpath("df4.csv.gz")
+    dump(df_path, compress=True)
+    new_df_path = tmp_path.joinpath("df4.csv.gz")
+    verify_single(new_df_path)
+
+    ## When the output dirname has only the CSV extension.
+    df_path = tmp_path.joinpath("df5.csv")
+    dump(df_path, compress=True)
+    new_df_path = tmp_path.joinpath("df5.csv.gz")
+    verify_single(new_df_path)
+
+    ## Multiple part files.
+    df_path = tmp_path.joinpath("df6")
+    dump(df_path, num_parts=3, compress=False)
+    contents = list(df_path.glob("*"))
+    assert dir_contains(contents, [
+        "part1.csv",
+        "part2.csv",
+        "part3.csv"
+    ])
+    verify_multiple(df_path, ["part1.csv", "part2.csv", "part3.csv"])
+
+    ## When files are already present.
+    ## Modify the contents to:
+    ## part1.csv, part3.csv, part4.csv.gz, part5_5.csv, other.txt.
+    extra_file = df_path.joinpath("part2.csv")
+    shutil.copy(str(extra_file), str(df_path.joinpath("other.txt")))
+    shutil.copy(str(extra_file), str(df_path.joinpath("part4.csv.gz")))
+    extra_file.rename(df_path.joinpath("part5-5.csv"))
+    dump(df_path, num_parts=3, compress=False, write_mode="append")
+    contents = list(df_path.glob("*"))
+    assert dir_contains(contents, [
+        "part1.csv",
+        "part3.csv",
+        "part4.csv.gz",
+        "part5.csv",
+        "part6.csv",
+        "part7.csv",
+        "part5-5.csv",
+        "other.txt"
+    ])
+    verify_multiple(df_path, ["part5.csv", "part6.csv", "part7.csv"])
+
+    ## Mutiple compressed part files.
+    df_path = tmp_path.joinpath("df7")
+    dump(df_path, num_parts=3, compress=True)
+    contents = list(df_path.glob("*"))
+    assert dir_contains(contents, [
+        "part1.csv.gz",
+        "part2.csv.gz",
+        "part3.csv.gz"
+    ])
+    verify_multiple(df_path, ["part1.csv.gz", "part2.csv.gz", "part3.csv.gz"])
+
+    ## When files are already present.
+    ## Modify the contents to:
+    ## part1.csv.gz, part3.csv.gz, part4.csv, part5_5.csv.gz, other.txt.
+    extra_file = df_path.joinpath("part2.csv.gz")
+    shutil.copy(str(extra_file), str(df_path.joinpath("other.txt")))
+    shutil.copy(str(extra_file), str(df_path.joinpath("part4.csv")))
+    extra_file.rename(df_path.joinpath("part5-5.csv.gz"))
+    dump(df_path, num_parts=3, compress=True, write_mode="append")
+    contents = list(df_path.glob("*"))
+    assert dir_contains(contents, [
+        "part1.csv.gz",
+        "part3.csv.gz",
+        "part4.csv",
+        "part5.csv.gz",
+        "part6.csv.gz",
+        "part7.csv.gz",
+        "part5-5.csv.gz",
+        "other.txt"
+    ])
+    verify_multiple(df_path, ["part5.csv.gz", "part6.csv.gz", "part7.csv.gz"])
