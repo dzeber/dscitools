@@ -13,7 +13,8 @@ test_deps = [
     "nbformat",
     "nbconvert",
     "ipykernel",
-    "jupyter_client"
+    "jupyter_client",
+    "moto"
 ]
 
 extras = {
@@ -49,7 +50,8 @@ setup(
     install_requires=[
         "numpy",
         "pandas",
-        "six"
+        "six",
+        "boto3"
     ],
     tests_require=test_deps,
     extras_require=extras

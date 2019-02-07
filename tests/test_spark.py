@@ -3,15 +3,19 @@ from pandas import DataFrame
 from pandas.util.testing import assert_frame_equal
 import gzip
 import shutil
+import time
 from pyspark.sql import SparkSession
 from pyspark.sql.utils import AnalysisException
+import boto3
+from moto import mock_s3
 
 from dscitools.spark import (
     show_df,
     renew_cache,
     get_colname,
     count_distinct,
-    dump_to_csv
+    dump_to_csv,
+    _simplify_csv_s3
 )
 
 
@@ -332,3 +336,184 @@ def test_simplify_local(spark_df, csv_rows, tmp_path, capsys):
         "other.txt"
     ])
     verify_multiple(df_path, ["part5.csv.gz", "part6.csv.gz", "part7.csv.gz"])
+
+
+@mock_s3
+def test_simplify_s3(spark_df, csv_rows, tmp_path, capsys):
+    BUCKET_NAME = "test-bucket"
+    S3 = boto3.resource("s3")
+    S3.create_bucket(Bucket=BUCKET_NAME)
+    BUCKET = S3.Bucket(BUCKET_NAME)
+
+    def dump(prefix, **kwargs):
+        ## To avoid problems connecting Spark to S3, just write files locally
+        ## and push to S3 for testing.
+        df_path = tmp_path.joinpath(prefix)
+        dump_to_csv(spark_df, str(df_path), simplify=False, **kwargs)
+        new_keys = []
+        if not prefix.endswith("/"):
+            prefix += "/"
+        start_time = time.time()
+        for p in df_path.glob("*"):
+            key = str(p.relative_to(tmp_path))
+            BUCKET.upload_file(str(p), key)
+            new_keys.append(key)
+        _simplify_csv_s3("s3://{}/{}".format(BUCKET_NAME, prefix), start_time)
+
+    def verify_single(key, prior_msg=""):
+        assert (
+            capsys.readouterr().out ==
+            prior_msg + "CSV output was written to {}.\n".format(key)
+        )
+        objects = list(BUCKET.objects.filter(Prefix=key))
+        objects = [obj for obj in objects if obj.key == key]
+        assert len(objects) == 1
+        out_dir = tmp_path.joinpath(key + "_out")
+        out_path = out_dir.joinpath(key)
+        out_dir.mkdir(parents=True)
+        BUCKET.download_file(key, str(out_path))
+        compare_csv(out_path, csv_rows)
+
+    def verify_multiple(prefix, all_contents, expected_files):
+        if not prefix.endswith("/"):
+            prefix += "/"
+        assert (
+            capsys.readouterr().out ==
+            "CSV output was written to {} across files {} to {}.\n".format(
+                prefix,
+                expected_files[0],
+                expected_files[-1]
+            )
+        )
+        objects = list(BUCKET.objects.filter(Prefix=prefix))
+        objects = [obj.key[len(prefix):] for obj in objects]
+        assert set(objects) == set(all_contents)
+
+        out_dir = tmp_path.joinpath(prefix + "_out")
+        out_dir.mkdir(parents=True)
+        for key in objects:
+            if key in expected_files:
+                BUCKET.download_file(prefix + key, str(out_dir.joinpath(key)))
+        compare_csv([str(p) for p in out_dir.glob("*")], csv_rows)
+
+    ## Single part file.
+    prefix = "df1"
+    dump(prefix, compress=False)
+    new_key = "df1.csv"
+    verify_single(new_key)
+
+    ## When the new filename already exists.
+    dump(prefix, compress=False, write_mode="overwrite")
+    verify_single(prefix,
+                  "Target key {} already exists.\n".format(new_key))
+
+    ## When the output dirname has the extension.
+    prefix = "df2.csv"
+    dump(prefix, compress=False)
+    new_key = "df2.csv"
+    verify_single(new_key)
+
+    ## Compressed.
+    prefix = "df3"
+    dump(prefix, compress=True)
+    new_key = "df3.csv.gz"
+    verify_single(new_key)
+
+    ## When the new filename already exists.
+    dump(prefix, compress=True, write_mode="overwrite")
+    assert (
+        capsys.readouterr().out ==
+        "Target key {} already exists.\n".format(new_key) +
+        "Gzipped CSV output was written to {}.\n".format(prefix)
+    )
+    objects = list(BUCKET.objects.filter(Prefix=prefix))
+    objects = [obj for obj in objects if obj.key == prefix]
+    assert len(objects) == 1
+    out_dir = tmp_path.joinpath(prefix + "_out")
+    ## Append the gzip extension so that it can be opened.
+    out_path = out_dir.joinpath(prefix).with_suffix(".gz")
+    out_dir.mkdir(parents=True)
+    BUCKET.download_file(prefix, str(out_path))
+    compare_csv(out_path, csv_rows)
+
+    ## When the output dirname has the extension.
+    prefix = "df4.csv.gz"
+    dump(prefix, compress=True)
+    new_key = "df4.csv.gz"
+    verify_single(new_key)
+
+    ## When the output dirname has only the CSV extension.
+    prefix = "df5.csv"
+    dump(prefix, compress=True)
+    new_key = "df5.csv.gz"
+    verify_single(new_key)
+
+    ## Multiple part files.
+    prefix = "df6"
+    dump(prefix, num_parts=3, compress=False)
+    verify_multiple(
+        prefix,
+        ["part1.csv", "part2.csv", "part3.csv"],
+        ["part1.csv", "part2.csv", "part3.csv"]
+    )
+
+    ## When files are already present.
+    copy_source = {"Bucket": BUCKET_NAME, "Key": prefix + "/part2.csv"}
+    BUCKET.copy(copy_source, prefix + "/other.txt")
+    BUCKET.copy(copy_source, prefix + "/part4.csv.gz")
+    BUCKET.copy(copy_source, prefix + "/part5.csv/other.txt")
+    BUCKET.copy(copy_source, prefix + "/part6-5.csv")
+    BUCKET.delete_objects(Delete={"Objects": [{"Key": copy_source["Key"]}]})
+    ## Use write_mode="overwrite" to overwrite the previous local output,
+    ## but not the contents on S3.
+    dump(prefix, num_parts=3, compress=False, write_mode="overwrite")
+    verify_multiple(
+        prefix,
+        [
+            "part1.csv",
+            "part3.csv",
+            "part4.csv.gz",
+            "part5.csv/other.txt",
+            "part6.csv",
+            "part7.csv",
+            "part8.csv",
+            "part6-5.csv",
+            "other.txt"
+        ],
+        ["part6.csv", "part7.csv", "part8.csv"]
+    )
+
+    ## Mutiple compressed part files.
+    prefix = "df7"
+    dump(prefix, num_parts=3, compress=True)
+    verify_multiple(
+        prefix,
+        ["part1.csv.gz", "part2.csv.gz", "part3.csv.gz"],
+        ["part1.csv.gz", "part2.csv.gz", "part3.csv.gz"]
+    )
+
+    ## When files are already present.
+    copy_source = {"Bucket": BUCKET_NAME, "Key": prefix + "/part2.csv.gz"}
+    BUCKET.copy(copy_source, prefix + "/other.txt")
+    BUCKET.copy(copy_source, prefix + "/part4.csv")
+    BUCKET.copy(copy_source, prefix + "/part5.csv/other.txt")
+    BUCKET.copy(copy_source, prefix + "/part6-5.csv.gz")
+    BUCKET.delete_objects(Delete={"Objects": [{"Key": copy_source["Key"]}]})
+    ## Use write_mode="overwrite" to overwrite the previous local output,
+    ## but not the contents on S3.
+    dump(prefix, num_parts=3, compress=True, write_mode="overwrite")
+    verify_multiple(
+        prefix,
+        [
+            "part1.csv.gz",
+            "part3.csv.gz",
+            "part4.csv",
+            "part5.csv/other.txt",
+            "part6.csv.gz",
+            "part7.csv.gz",
+            "part8.csv.gz",
+            "part6-5.csv.gz",
+            "other.txt"
+        ],
+        ["part6.csv.gz", "part7.csv.gz", "part8.csv.gz"]
+    )
