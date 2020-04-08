@@ -39,8 +39,6 @@ def fmt_count(n,
         `"<description>: <n (pretty-printed)>" +
             " (<percentage of n out of n_overall> of <description_overall>)"`
 
-    The initial description is capitalized.
-
     Parameters
     ----------
     n : numeric
@@ -81,7 +79,6 @@ def fmt_count(n,
 
     components = []
     if description:
-        description = description.capitalize()
         components.append(descr_fmt.format(description))
     components.append(n_fmt.format(n))
     if n_overall:

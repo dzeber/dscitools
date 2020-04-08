@@ -10,7 +10,7 @@ def count():
 
 @pytest.fixture
 def description():
-    return "number of items"
+    return "Number of items"
 
 
 @pytest.fixture
