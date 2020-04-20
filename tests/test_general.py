@@ -1,147 +1,94 @@
 import pytest
 from numpy import array as nparray
-from dscitools.general import fmt_count
+from dscitools.general import fmt_count, now, today
+from dscitools.general import datetime
+
+COUNT = 3592
+DESCRIPTION = "Number of items"
+OVERALL_TOTAL = 10000
+OVERALL_DESCRIPTION = "overall"
+FLOAT_COUNT = 27.82
+FLOAT_OVERALL_TOTAL = 146.3
+MOCK_DATETIME = datetime.datetime(2020, 4, 18, 12, 36, 10)
 
 
 @pytest.fixture
-def count():
-    return 3592
+def np_data():
+    return nparray([COUNT, OVERALL_TOTAL - COUNT], dtype="int64")
 
 
-@pytest.fixture
-def description():
-    return "Number of items"
+def test_now(monkeypatch):
+    class MockDT:
+        def now():
+            return MOCK_DATETIME
+
+    monkeypatch.setattr(datetime, "datetime", MockDT)
+
+    assert now() == "Sat Apr 18 12:36:10 2020"
 
 
-@pytest.fixture
-def overall_total():
-    return 10000
+def test_today(monkeypatch):
+    class MockDate:
+        def today():
+            return MOCK_DATETIME.date()
+
+    monkeypatch.setattr(datetime, "date", MockDate)
+
+    assert today() == "2020-04-18"
 
 
-@pytest.fixture
-def overall_description():
-    return "overall"
+def test_fmt_count_basic(capsys):
+    fmtted = fmt_count(COUNT, print_result=False)
+    assert fmtted == "3,592"
 
+    fmtted = fmt_count(COUNT, DESCRIPTION, print_result=False)
+    assert fmtted == "Number of items:  3,592"
 
-@pytest.fixture
-def np_data(count, overall_total):
-    return nparray([count, overall_total - count],
-                   dtype="int64")
+    fmtted = fmt_count(COUNT, DESCRIPTION, OVERALL_TOTAL, print_result=False)
+    assert fmtted == "Number of items:  3,592 out of 10,000  (35.92%)"
 
-
-@pytest.fixture
-def float_count():
-    return 27.82
-
-
-@pytest.fixture
-def float_overall_total():
-    return 146.3
-
-
-def test_fmt_count_basic(count):
-    assert (
-        fmt_count(count,
-                  print_result=False) ==
-        "3,592"
+    fmtted = fmt_count(
+        COUNT, DESCRIPTION, OVERALL_TOTAL, OVERALL_DESCRIPTION, print_result=False
     )
+    assert fmtted == "Number of items:  3,592 out of 10,000 overall  (35.92%)"
 
-
-def test_fmt_count_with_description(count, description):
-    assert (
-        fmt_count(count,
-                  description,
-                  print_result=False) ==
-        "Number of items:  3,592"
-    )
-
-
-def test_fmt_count_with_total(count, description, overall_total):
-    assert (
-        fmt_count(count,
-                  description,
-                  overall_total,
-                  print_result=False) ==
-        "Number of items:  3,592 out of 10,000  (35.92%)"
-    )
-
-
-def test_fmt_count_with_total_description(count,
-                                          description,
-                                          overall_total,
-                                          overall_description):
-    assert (
-        fmt_count(count,
-                  description,
-                  overall_total,
-                  overall_description,
-                  print_result=False) ==
-        "Number of items:  3,592 out of 10,000 overall  (35.92%)"
-    )
-
-
-def test_fmt_count_hide_total(count, description, overall_total):
-    assert (
-        fmt_count(count,
-                  description,
-                  overall_total,
-                  show_n_overall=False,
-                  print_result=False) ==
-        "Number of items:  3,592  (35.92%)"
-    )
-
-
-def test_fmt_count_hide_total_with_description(count,
-                                               description,
-                                               overall_total,
-                                               overall_description):
-    assert (
-        fmt_count(count,
-                  description,
-                  overall_total,
-                  overall_description,
-                  show_n_overall=False,
-                  print_result=False) ==
-        "Number of items:  3,592  (35.92% of overall)"
-    )
-
-
-def test_fmt_count_print_result(count, description, capsys):
-    fmt_count(count,
-              description,
-              print_result=True)
+    fmt_count(COUNT, DESCRIPTION, print_result=True)
     output = capsys.readouterr()
     assert output.out == "Number of items:  3,592\n"
 
 
-def test_fmt_count_with_np_types(np_data, description):
+def test_fmt_count_hide_total():
+    fmtted = fmt_count(
+        COUNT, DESCRIPTION, OVERALL_TOTAL, show_n_overall=False, print_result=False
+    )
+    assert fmtted == "Number of items:  3,592  (35.92%)"
+
+    fmtted = fmt_count(
+        COUNT,
+        DESCRIPTION,
+        OVERALL_TOTAL,
+        OVERALL_DESCRIPTION,
+        show_n_overall=False,
+        print_result=False,
+    )
+    assert fmtted == "Number of items:  3,592  (35.92% of overall)"
+
+
+def test_fmt_count_with_np_types(np_data):
     count = np_data[0]
     total = np_data.sum()
-    assert (
-        fmt_count(count,
-                  description,
-                  total,
-                  print_result=False) ==
-        "Number of items:  3,592 out of 10,000  (35.92%)"
-    )
+    fmtted = fmt_count(count, DESCRIPTION, total, print_result=False)
+    assert fmtted == "Number of items:  3,592 out of 10,000  (35.92%)"
 
 
-def test_fmt_count_with_zero_total(count, description):
+def test_fmt_count_with_zero_total():
     ## This falls back silently to the case where 'n_overall' is not given.
-    assert (
-        fmt_count(count,
-                  description,
-                  n_overall=0,
-                  print_result=False) ==
-        "Number of items:  3,592"
-    )
+    fmtted = fmt_count(COUNT, DESCRIPTION, n_overall=0, print_result=False)
+    assert fmtted == "Number of items:  3,592"
 
 
-def test_fmt_count_with_floats(float_count, description, float_overall_total):
-    assert (
-        fmt_count(float_count,
-                  description,
-                  float_overall_total,
-                  print_result=False) ==
-        "Number of items:  27.82 out of 146.3  (19.02%)"
+def test_fmt_count_with_floats():
+    fmtted = fmt_count(
+        FLOAT_COUNT, DESCRIPTION, FLOAT_OVERALL_TOTAL, print_result=False
     )
+    assert fmtted == "Number of items:  27.82 out of 146.3  (19.02%)"
