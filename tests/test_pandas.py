@@ -431,7 +431,7 @@ def test_fmt_count_pct_colnames(count_df,
                                 prop_df,
                                 prop_total_df):
     ## Test supplying custom names for the percent columns.
-    prop_df = prop_df.rename({"proportion": "thepct"}, axis="columns")
+    prop_df = prop_df.rename(columns={"proportion": "thepct"})
     result = fmt_count_df(count_df,
                           pct_col_name="thepct",
                           fmt=False)
@@ -441,16 +441,14 @@ def test_fmt_count_pct_colnames(count_df,
                           fmt=False)
     assert result.equals(prop_df)
 
-    expected = prop_total_df.rename({"proportion": "thepct"},
-                                    axis="columns")
+    expected = prop_total_df.rename(columns={"proportion": "thepct"})
     result = fmt_count_df(count_total_df,
                           count_col=["count", "total"],
                           pct_col_name=["thepct", None],
                           fmt=False)
     assert result.equals(expected)
-    expected = prop_total_df.rename({"proportion": "thepct",
-                                     "prop_total": "totpct"},
-                                    axis="columns")
+    expected = prop_total_df.rename(columns={"proportion": "thepct",
+                                     "prop_total": "totpct"})
     result = fmt_count_df(count_total_df,
                           count_col=["count", "total"],
                           pct_col_name=["thepct", "totpct"],

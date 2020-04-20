@@ -7,7 +7,13 @@ import inspect
 import warnings
 
 from pandas import DataFrame
-from pandas import isna
+try:
+    from pandas import isna
+except ImportError:
+    # Fix for older versions of pandas
+    from pandas import isnull
+    isna = isnull
+
 from pandas.api.types import (
     is_list_like,
     is_integer_dtype,
