@@ -1,5 +1,6 @@
 import pytest
 from numpy import array as nparray
+
 from dscitools.general import fmt_count, now, today
 from dscitools.general import datetime
 
@@ -48,7 +49,11 @@ def test_fmt_count_basic(capsys):
     assert fmtted == "Number of items:  3,592 out of 10,000  (35.92%)"
 
     fmtted = fmt_count(
-        COUNT, DESCRIPTION, OVERALL_TOTAL, OVERALL_DESCRIPTION, print_result=False
+        COUNT,
+        DESCRIPTION,
+        OVERALL_TOTAL,
+        OVERALL_DESCRIPTION,
+        print_result=False,
     )
     assert fmtted == "Number of items:  3,592 out of 10,000 overall  (35.92%)"
 
@@ -59,7 +64,11 @@ def test_fmt_count_basic(capsys):
 
 def test_fmt_count_hide_total():
     fmtted = fmt_count(
-        COUNT, DESCRIPTION, OVERALL_TOTAL, show_n_overall=False, print_result=False
+        COUNT,
+        DESCRIPTION,
+        OVERALL_TOTAL,
+        show_n_overall=False,
+        print_result=False,
     )
     assert fmtted == "Number of items:  3,592  (35.92%)"
 

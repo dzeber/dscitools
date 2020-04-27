@@ -1,15 +1,17 @@
 import pytest
+
 from dscitools.ipython import (
     print_md,
     print_assertion,
     MarkdownMessage,
     StatusMessage,
-    AssertMessage
+    AssertMessage,
 )
+
 ## Import the module itself so it can be monkeypatched.
 from dscitools import ipython as ip
-
 from tests.utils import call_func_in_notebook
+
 
 @pytest.fixture
 def markdown_text():
@@ -53,8 +55,10 @@ def status_message():
 
 @pytest.fixture
 def status_message_encoded():
-    return "__This&nbsp;happened:&nbsp;&nbsp;Tue&nbsp;Nov&nbsp;20&nbsp;" + \
-           "15:23:42&nbsp;2018__"
+    return (
+        "__This&nbsp;happened:&nbsp;&nbsp;Tue&nbsp;Nov&nbsp;20&nbsp;"
+        + "15:23:42&nbsp;2018__"
+    )
 
 
 def validate_notebook_output(output, expected_plain, expected_md):
@@ -84,18 +88,18 @@ def mock_print_status(status_text, mock_now_str):
     # TODO: still necessary?
     def mocknow():
         return mock_now_str
+
     from dscitools import ipython as ip
+
     _oldnow = ip.now
     ip.now = mocknow
     ip.print_status(status_text)
     ip.now = _oldnow
 
 
-def test_print_status(status_text,
-                      status_message,
-                      status_message_encoded,
-                      capsys,
-                      mock_now):
+def test_print_status(
+    status_text, status_message, status_message_encoded, capsys, mock_now
+):
     ## Test in the console (non-rich) environment.
     mock_print_status(status_text, mock_now)
     output = capsys.readouterr().out
@@ -106,23 +110,25 @@ def test_print_status(status_text,
     validate_notebook_output(nb_output, status_message, status_message_encoded)
 
 
-def test_print_assertion(status_text,
-                         assertion_result,
-                         assertion_message,
-                         assertion_message_encoded,
-                         capsys):
+def test_print_assertion(
+    status_text,
+    assertion_result,
+    assertion_message,
+    assertion_message_encoded,
+    capsys,
+):
     ## Test in the console (non-rich) environment.
     print_assertion(status_text, assertion_result)
     output = capsys.readouterr().out
     assert output == assertion_message + "\n"
 
     ## Test in the notebook environment.
-    nb_output = call_func_in_notebook(print_assertion,
-                                status_text,
-                                assertion_result)
-    validate_notebook_output(nb_output,
-                             assertion_message,
-                             assertion_message_encoded)
+    nb_output = call_func_in_notebook(
+        print_assertion, status_text, assertion_result
+    )
+    validate_notebook_output(
+        nb_output, assertion_message, assertion_message_encoded
+    )
 
 
 def test_markdownmessage(markdown_text, markdown_text_encoded):
@@ -131,13 +137,12 @@ def test_markdownmessage(markdown_text, markdown_text_encoded):
     assert md_obj._repr_markdown_() == markdown_text_encoded
 
 
-def test_statusmessage(status_text,
-                       status_message,
-                       status_message_encoded,
-                       monkeypatch,
-                       mock_now):
+def test_statusmessage(
+    status_text, status_message, status_message_encoded, monkeypatch, mock_now
+):
     def mocknow():
         return mock_now
+
     monkeypatch.setattr(ip, "now", mocknow)
 
     md_obj = StatusMessage(status_text)
@@ -145,10 +150,9 @@ def test_statusmessage(status_text,
     assert md_obj._repr_markdown_() == status_message_encoded
 
 
-def test_assertmessage(status_text,
-                       assertion_result,
-                       assertion_message,
-                       assertion_message_encoded):
+def test_assertmessage(
+    status_text, assertion_result, assertion_message, assertion_message_encoded
+):
     md_obj = AssertMessage(status_text, assertion_result)
     assert md_obj.__repr__() == assertion_message
     assert md_obj._repr_markdown_() == assertion_message_encoded
