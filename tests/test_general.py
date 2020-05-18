@@ -20,7 +20,8 @@ def np_data():
 
 def test_now(monkeypatch):
     class MockDT:
-        def now():
+        @classmethod
+        def now(cls):
             return MOCK_DATETIME
 
     monkeypatch.setattr(datetime, "datetime", MockDT)
@@ -30,7 +31,8 @@ def test_now(monkeypatch):
 
 def test_today(monkeypatch):
     class MockDate:
-        def today():
+        @classmethod
+        def today(cls):
             return MOCK_DATETIME.date()
 
     monkeypatch.setattr(datetime, "date", MockDate)
