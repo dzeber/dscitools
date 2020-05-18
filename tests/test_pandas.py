@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from pandas import DataFrame
 from numpy import nan as npnan
@@ -6,18 +8,17 @@ from IPython.display import display
 from dscitools.pandas import FormattedDataFrame, fmt_df, fmt_count_df
 from tests.utils import call_func_in_notebook
 
-import re
+
+BASE_DF = {
+    "group": ["a", "b", "c", "d", "e"],
+    "num": [10235, 6426, 325, -9453, -1362],
+    "prop": [0.02426, 0.3333333, 0.578135, 0.7, 0.25],
+}
 
 
 @pytest.fixture
 def df():
-    return DataFrame(
-        {
-            "group": ["a", "b", "c", "d", "e"],
-            "num": [10235, 6426, 325, -9453, -1362],
-            "prop": [0.02426, 0.3333333, 0.578135, 0.7, 0.25],
-        }
-    )
+    return DataFrame(BASE_DF)[["group", "num", "prop"]]
 
 
 @pytest.fixture
@@ -27,7 +28,8 @@ def count_total_df():
             "group": ["a", "b", "c"],
             "count": [10235, 325, 6426],
             "total": [15590, 498, 15593],
-        }
+        },
+        columns=["group", "count", "total"],
     )
 
 
@@ -85,7 +87,8 @@ def compare_formatteddataframe_string_html(fdf, expected):
 
     nb_str, nb_html = formatteddataframe_notebook_display(fdf)
     assert nb_str == expected.to_string()
-    #assert nb_html == expected.to_html()
+    # TODO: enable
+    # assert nb_html == expected.to_html()
 
 
 def compare_formatteddataframe_string_html_explicit(fdf, expected, formatters):
@@ -120,17 +123,14 @@ def dollar_fmt(v):
     return v_fmt
 
 
-### Testing for fmt_df ###
-
-
 def test_default_formatting(df):
     expected = DataFrame(
         {
             "group": ["a", "b", "c", "d", "e"],
             "num": ["10,235", "6,426", "325", "-9,453", "-1,362"],
-            "prop": ["0.02", "0.33", "0.58", "0.70", "0.25"],
+            "prop": [0.02, 0.33, 0.58, 0.70, 0.25],
         }
-    )
+    )[["group", "num", "prop"]]
 
     compare_formatting(df, expected)
 
@@ -142,25 +142,23 @@ def test_explicit_formatter_override(df):
             "num": ["10235.0", "6426.0", "325.0", "-9453.0", "-1362.0"],
             "prop": ["0.0243", "0.3333", "0.5781", "0.7000", "0.2500"],
         }
-    )
+    )[["group", "num", "prop"]]
 
-    # Formatting specified here should get overridden by explicit formatting
-    # passed to rendering functions.
-    fmt_obj = FormattedDataFrame(df, fmt_percent="prop")
-    fmt_api = fmt_df(df, fmt_percent="prop")
-
-    ## Spacing for positive/negative signs must be specified explicitly here.
     explicit_fmt = {
         ## This should override dynamic detection of "num" as an int column.
         "num": "{: .1f}".format,
         ## This should override static formatting of "prop" as a pct column.
         "prop": "{: .4f}".format,
     }
-    comp_func = lambda obs, exp: compare_formatteddataframe_string_html_explicit(
-        obs, exp, formatters=explicit_fmt
-    )
 
-    compare_formatting(df, expected, comp_func=comp_func)
+    def compare_fdfs(obs, exp):
+        compare_formatteddataframe_string_html_explicit(
+            obs, exp, formatters=explicit_fmt
+        )
+
+    compare_formatting(
+        df, expected, comp_func=compare_fdfs, fmt_percent="prop"
+    )
 
 
 def test_static_formatting(df):
@@ -185,7 +183,7 @@ def test_static_formatting(df):
             ],
             "pct": ["2.43%", "33.33%", "57.81%", "70.00%", "25.00%"],
         }
-    )
+    )[["group", "num", "prop", "numfl", "amount", "pct"]]
 
     df["numfl"] = df["num"]
     df["amount"] = df["num"]
@@ -203,12 +201,16 @@ def test_static_formatting(df):
 
 
 def test_fmt_custom_precision(df):
-    df["pct"] = df["prop"]
+    expected = DataFrame(
+        {
+            "group": ["a", "b", "c", "d", "e"],
+            "num": ["10,235", "6,426", "325", "-9,453", "-1,362"],
+            "prop": ["0.0243", "0.3333", "0.5781", "0.7000", "0.2500"],
+            "pct": ["2.426%", "33.333%", "57.813%", "70.000%", "25.000%"],
+        }
+    )[["group", "num", "prop", "pct"]]
 
-    expected = df.copy()
-    expected["num"] = expected["num"].apply("{:,}".format)
-    expected["prop"] = expected["prop"].apply("{:.4f}".format)
-    expected["pct"] = expected["pct"].apply("{:.3%}".format)
+    df["pct"] = df["prop"]
 
     compare_formatting(
         df, expected, fmt_percent="pct", precision={"prop": 4, "pct": 3}
@@ -245,15 +247,25 @@ def test_modified_formatteddataframe(df):
 
 
 def test_fmt_args(df):
+    expected = DataFrame(
+        {
+            "group": ["a", "b", "c", "d", "e"],
+            "num": ["10,235", "6,426", "325", "-9,453", "-1,362"],
+            "prop": ["0.02", "0.33", "0.58", "0.70", "0.25"],
+            "numfl": [
+                "10,235.00",
+                "6,426.00",
+                "325.00",
+                "-9,453.00",
+                "-1,362.00",
+            ],
+            "pct": ["2.43%", "33.33%", "57.81%", "70.00%", "25.00%"],
+        }
+    )[["group", "num", "prop", "numfl", "pct"]]
+
     ## Formatting params should accept both single strings and list-likes.
     df["numfl"] = df["num"]
     df["pct"] = df["prop"]
-
-    expected = df.copy()
-    expected["num"] = expected["num"].apply("{:,}".format)
-    expected["prop"] = expected["prop"].apply("{:.2f}".format)
-    expected["numfl"] = expected["numfl"].apply("{:,.2f}".format)
-    expected["pct"] = expected["pct"].apply("{:.2%}".format)
 
     compare_formatting(
         df,
@@ -272,19 +284,31 @@ def test_fmt_na_handling(df):
     df.loc[1, "num"] = npnan
     df.loc[3, "prop"] = npnan
 
+    expected = DataFrame(
+        {
+            "group": ["a", "b", "c", "d", "e"],
+            "num": ["10,235", "NaN", "325", "-9,453", "-1,362"],
+            "prop": ["0.02", "0.33", "0.58", "NaN", "0.25"],
+        }
+    )[["group", "num", "prop"]]
+
     ## Formatting should work as if NaNs were excluded.
-    expected = base_df.copy()
-    expected["num"] = expected["num"].apply("{:,}".format)
-    expected["prop"] = expected["prop"].apply("{:.2f}".format)
-    expected.loc[1, "num"] = FormattedDataFrame.NAN_STRING
-    expected.loc[3, "prop"] = FormattedDataFrame.NAN_STRING
     compare_formatting(df, expected)
 
-    expected = base_df.copy()
-    expected["num"] = expected["num"].apply(dollar_fmt)
-    expected["prop"] = expected["prop"].apply("{:.3%}".format)
-    expected.loc[1, "num"] = FormattedDataFrame.NAN_STRING
-    expected.loc[3, "prop"] = FormattedDataFrame.NAN_STRING
+    expected = DataFrame(
+        {
+            "group": ["a", "b", "c", "d", "e"],
+            "num": [
+                "$10,235.00",
+                "NaN",
+                "$325.00",
+                "-$9,453.00",
+                "-$1,362.00",
+            ],
+            "prop": ["2.426%", "33.333%", "57.813%", "NaN", "25.000%"],
+        }
+    )[["group", "num", "prop"]]
+
     compare_formatting(
         df,
         expected,
