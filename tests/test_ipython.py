@@ -10,7 +10,7 @@ from dscitools.ipython import (
 
 ## Import the module itself so it can be monkeypatched.
 from dscitools import ipython as ip
-from tests.utils import call_func_in_notebook
+from tests.utils import get_notebook_rich_output
 
 
 @pytest.fixture
@@ -63,12 +63,8 @@ def status_message_encoded():
 
 def validate_notebook_output(output, expected_plain, expected_md):
     ## Did we get the appropriate rich output in the notebook?
-    assert len(output) == 1
-    output = output[0]
-    assert output.get("output_type") == "display_data"
-    data = output.get("data", {})
-    assert data.get("text/plain") == expected_plain
-    assert data.get("text/markdown") == expected_md
+    assert output.get("text/plain") == expected_plain
+    assert output.get("text/markdown") == expected_md
 
 
 def test_print_md(markdown_text, markdown_text_encoded, capsys):
@@ -78,7 +74,7 @@ def test_print_md(markdown_text, markdown_text_encoded, capsys):
     assert output == markdown_text + "\n"
 
     ## Test in the notebook environment.
-    nb_output = call_func_in_notebook(print_md, markdown_text)
+    nb_output = get_notebook_rich_output(print_md, markdown_text)
     validate_notebook_output(nb_output, markdown_text, markdown_text_encoded)
 
 
@@ -106,7 +102,9 @@ def test_print_status(
     assert output == status_message + "\n"
 
     ## Test in the notebook environment.
-    nb_output = call_func_in_notebook(mock_print_status, status_text, mock_now)
+    nb_output = get_notebook_rich_output(
+        mock_print_status, status_text, mock_now
+    )
     validate_notebook_output(nb_output, status_message, status_message_encoded)
 
 
@@ -123,7 +121,7 @@ def test_print_assertion(
     assert output == assertion_message + "\n"
 
     ## Test in the notebook environment.
-    nb_output = call_func_in_notebook(
+    nb_output = get_notebook_rich_output(
         print_assertion, status_text, assertion_result
     )
     validate_notebook_output(

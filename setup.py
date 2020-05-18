@@ -14,7 +14,8 @@ test_deps = [
     "nbconvert",
     "ipykernel",
     "jupyter_client",
-    "moto"
+    "moto",
+    "dill"
 ]
 
 extras = {
