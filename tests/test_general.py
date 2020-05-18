@@ -2,7 +2,6 @@ import pytest
 from numpy import array as nparray
 
 from dscitools.general import fmt_count, now, today
-from dscitools.general import datetime
 
 COUNT = 3592
 DESCRIPTION = "Number of items"
@@ -10,7 +9,6 @@ OVERALL_TOTAL = 10000
 OVERALL_DESCRIPTION = "overall"
 FLOAT_COUNT = 27.82
 FLOAT_OVERALL_TOTAL = 146.3
-MOCK_DATETIME = datetime.datetime(2020, 4, 18, 12, 36, 10)
 
 
 @pytest.fixture
@@ -18,25 +16,11 @@ def np_data():
     return nparray([COUNT, OVERALL_TOTAL - COUNT], dtype="int64")
 
 
-def test_now(monkeypatch):
-    class MockDT:
-        @classmethod
-        def now(cls):
-            return MOCK_DATETIME
-
-    monkeypatch.setattr(datetime, "datetime", MockDT)
-
+def test_now(mock_general_datetime):
     assert now() == "Sat Apr 18 12:36:10 2020"
 
 
-def test_today(monkeypatch):
-    class MockDate:
-        @classmethod
-        def today(cls):
-            return MOCK_DATETIME.date()
-
-    monkeypatch.setattr(datetime, "date", MockDate)
-
+def test_today(mock_general_datetime):
     assert today() == "2020-04-18"
 
 
@@ -93,7 +77,7 @@ def test_fmt_count_with_np_types(np_data):
 
 
 def test_fmt_count_with_zero_total():
-    ## This falls back silently to the case where 'n_overall' is not given.
+    # This falls back silently to the case where 'n_overall' is not given.
     fmtted = fmt_count(COUNT, DESCRIPTION, n_overall=0, print_result=False)
     assert fmtted == "Number of items:  3,592"
 
