@@ -15,19 +15,16 @@ from dscitools.spark import (
     get_colname,
     count_distinct,
     dump_to_csv,
-    _simplify_csv_s3
+    _simplify_csv_s3,
 )
 
 
 @pytest.fixture(scope="module")
 def spark():
     spark = (
-        SparkSession
-        .builder
-        .master("local")
-        .appName("dscitools_test")
+        SparkSession.builder.master("local").appName("dscitools_test")
         ## Requirement to get Spark to work with S3.
-        #.config("spark.jars.packages",
+        # .config("spark.jars.packages",
         #        "org.apache.hadoop:hadoop-aws:2.7.3")
         .getOrCreate()
     )
@@ -40,10 +37,12 @@ def spark():
 
 @pytest.fixture
 def pandas_df():
-    return DataFrame({
-        "label": ["a", "a", "a", "b", "b", "b", "c", "c"],
-        "value": [1, 2, 3, 4, 5, 1, 2, 3]
-    })
+    return DataFrame(
+        {
+            "label": ["a", "a", "a", "b", "b", "b", "c", "c"],
+            "value": [1, 2, 3, 4, 5, 1, 2, 3],
+        }
+    )
 
 
 @pytest.fixture
@@ -62,7 +61,7 @@ def csv_rows():
         "b,5",
         "b,1",
         "c,2",
-        "c,3"
+        "c,3",
     ]
 
 
@@ -183,14 +182,18 @@ def test_dump_to_csv(spark_df, csv_rows, tmp_path):
     with pytest.raises(AnalysisException):
         dump(df_path, compress=False)
 
-    dump_to_csv(spark_df.where("label = 'a'"),
-                str(df_path),
-                write_mode="overwrite",
-                compress=False,
-                simplify=False)
+    dump_to_csv(
+        spark_df.where("label = 'a'"),
+        str(df_path),
+        write_mode="overwrite",
+        compress=False,
+        simplify=False,
+    )
     csv_files = list(df_path.glob("*.csv"))
     assert len(csv_files) == 1
-    a_rows = [r for i, r in enumerate(csv_rows) if i == 0 or r.startswith("a,")]
+    a_rows = [
+        r for i, r in enumerate(csv_rows) if i == 0 or r.startswith("a,")
+    ]
     compare_csv(csv_files, a_rows)
 
 
@@ -205,21 +208,15 @@ def test_simplify_local(spark_df, csv_rows, tmp_path, capsys):
         dump_to_csv(spark_df, str(path), simplify=True, **kwargs)
 
     def verify_single(out_path, prior_msg=""):
-        assert (
-            capsys.readouterr().out ==
-            prior_msg + "CSV output was written to {}.\n".format(out_path)
+        assert capsys.readouterr().out == prior_msg + "CSV output was written to {}.\n".format(
+            out_path
         )
         assert out_path.is_file()
         compare_csv(out_path, csv_rows)
 
     def verify_multiple(out_path, expected_files):
-        assert (
-            capsys.readouterr().out ==
-            "CSV output was written to {} across files {} to {}.\n".format(
-                out_path,
-                expected_files[0],
-                expected_files[-1]
-            )
+        assert capsys.readouterr().out == "CSV output was written to {} across files {} to {}.\n".format(
+            out_path, expected_files[0], expected_files[-1]
         )
         assert out_path.is_dir()
         csvs = [p for p in out_path.glob("*") if p.name in expected_files]
@@ -233,8 +230,9 @@ def test_simplify_local(spark_df, csv_rows, tmp_path, capsys):
 
     ## When the new filename already exists.
     dump(df_path, compress=False)
-    verify_single(df_path,
-                  "Target file {} already exists.\n".format(new_df_path))
+    verify_single(
+        df_path, "Target file {} already exists.\n".format(new_df_path)
+    )
 
     ## When the output dirname has the extension.
     df_path = tmp_path.joinpath("df2.csv")
@@ -250,10 +248,10 @@ def test_simplify_local(spark_df, csv_rows, tmp_path, capsys):
 
     ## When the new filename already exists.
     dump(df_path, compress=True)
-    assert (
-        capsys.readouterr().out ==
-        "Target file {} already exists.\n".format(new_df_path) +
-        "Gzipped CSV output was written to {}.\n".format(df_path)
+    assert capsys.readouterr().out == "Target file {} already exists.\n".format(
+        new_df_path
+    ) + "Gzipped CSV output was written to {}.\n".format(
+        df_path
     )
     assert df_path.is_file()
     ## Append the gzip extension so that it can be opened.
@@ -277,11 +275,7 @@ def test_simplify_local(spark_df, csv_rows, tmp_path, capsys):
     df_path = tmp_path.joinpath("df6")
     dump(df_path, num_parts=3, compress=False)
     contents = list(df_path.glob("*"))
-    assert dir_contains(contents, [
-        "part1.csv",
-        "part2.csv",
-        "part3.csv"
-    ])
+    assert dir_contains(contents, ["part1.csv", "part2.csv", "part3.csv"])
     verify_multiple(df_path, ["part1.csv", "part2.csv", "part3.csv"])
 
     ## When files are already present.
@@ -293,27 +287,28 @@ def test_simplify_local(spark_df, csv_rows, tmp_path, capsys):
     extra_file.rename(df_path.joinpath("part5-5.csv"))
     dump(df_path, num_parts=3, compress=False, write_mode="append")
     contents = list(df_path.glob("*"))
-    assert dir_contains(contents, [
-        "part1.csv",
-        "part3.csv",
-        "part4.csv.gz",
-        "part5.csv",
-        "part6.csv",
-        "part7.csv",
-        "part5-5.csv",
-        "other.txt"
-    ])
+    assert dir_contains(
+        contents,
+        [
+            "part1.csv",
+            "part3.csv",
+            "part4.csv.gz",
+            "part5.csv",
+            "part6.csv",
+            "part7.csv",
+            "part5-5.csv",
+            "other.txt",
+        ],
+    )
     verify_multiple(df_path, ["part5.csv", "part6.csv", "part7.csv"])
 
     ## Mutiple compressed part files.
     df_path = tmp_path.joinpath("df7")
     dump(df_path, num_parts=3, compress=True)
     contents = list(df_path.glob("*"))
-    assert dir_contains(contents, [
-        "part1.csv.gz",
-        "part2.csv.gz",
-        "part3.csv.gz"
-    ])
+    assert dir_contains(
+        contents, ["part1.csv.gz", "part2.csv.gz", "part3.csv.gz"]
+    )
     verify_multiple(df_path, ["part1.csv.gz", "part2.csv.gz", "part3.csv.gz"])
 
     ## When files are already present.
@@ -325,16 +320,19 @@ def test_simplify_local(spark_df, csv_rows, tmp_path, capsys):
     extra_file.rename(df_path.joinpath("part5-5.csv.gz"))
     dump(df_path, num_parts=3, compress=True, write_mode="append")
     contents = list(df_path.glob("*"))
-    assert dir_contains(contents, [
-        "part1.csv.gz",
-        "part3.csv.gz",
-        "part4.csv",
-        "part5.csv.gz",
-        "part6.csv.gz",
-        "part7.csv.gz",
-        "part5-5.csv.gz",
-        "other.txt"
-    ])
+    assert dir_contains(
+        contents,
+        [
+            "part1.csv.gz",
+            "part3.csv.gz",
+            "part4.csv",
+            "part5.csv.gz",
+            "part6.csv.gz",
+            "part7.csv.gz",
+            "part5-5.csv.gz",
+            "other.txt",
+        ],
+    )
     verify_multiple(df_path, ["part5.csv.gz", "part6.csv.gz", "part7.csv.gz"])
 
 
@@ -361,9 +359,8 @@ def test_simplify_s3(spark_df, csv_rows, tmp_path, capsys):
         _simplify_csv_s3("s3://{}/{}".format(BUCKET_NAME, prefix), start_time)
 
     def verify_single(key, prior_msg=""):
-        assert (
-            capsys.readouterr().out ==
-            prior_msg + "CSV output was written to {}.\n".format(key)
+        assert capsys.readouterr().out == prior_msg + "CSV output was written to {}.\n".format(
+            key
         )
         objects = list(BUCKET.objects.filter(Prefix=key))
         objects = [obj for obj in objects if obj.key == key]
@@ -377,16 +374,11 @@ def test_simplify_s3(spark_df, csv_rows, tmp_path, capsys):
     def verify_multiple(prefix, all_contents, expected_files):
         if not prefix.endswith("/"):
             prefix += "/"
-        assert (
-            capsys.readouterr().out ==
-            "CSV output was written to {} across files {} to {}.\n".format(
-                prefix,
-                expected_files[0],
-                expected_files[-1]
-            )
+        assert capsys.readouterr().out == "CSV output was written to {} across files {} to {}.\n".format(
+            prefix, expected_files[0], expected_files[-1]
         )
         objects = list(BUCKET.objects.filter(Prefix=prefix))
-        objects = [obj.key[len(prefix):] for obj in objects]
+        objects = [obj.key[len(prefix) :] for obj in objects]
         assert set(objects) == set(all_contents)
 
         out_dir = tmp_path.joinpath(prefix + "_out")
@@ -404,8 +396,7 @@ def test_simplify_s3(spark_df, csv_rows, tmp_path, capsys):
 
     ## When the new filename already exists.
     dump(prefix, compress=False, write_mode="overwrite")
-    verify_single(prefix,
-                  "Target key {} already exists.\n".format(new_key))
+    verify_single(prefix, "Target key {} already exists.\n".format(new_key))
 
     ## When the output dirname has the extension.
     prefix = "df2.csv"
@@ -421,11 +412,9 @@ def test_simplify_s3(spark_df, csv_rows, tmp_path, capsys):
 
     ## When the new filename already exists.
     dump(prefix, compress=True, write_mode="overwrite")
-    assert (
-        capsys.readouterr().out ==
-        "Target key {} already exists.\n".format(new_key) +
-        "Gzipped CSV output was written to {}.\n".format(prefix)
-    )
+    assert capsys.readouterr().out == "Target key {} already exists.\n".format(
+        new_key
+    ) + "Gzipped CSV output was written to {}.\n".format(prefix)
     objects = list(BUCKET.objects.filter(Prefix=prefix))
     objects = [obj for obj in objects if obj.key == prefix]
     assert len(objects) == 1
@@ -454,7 +443,7 @@ def test_simplify_s3(spark_df, csv_rows, tmp_path, capsys):
     verify_multiple(
         prefix,
         ["part1.csv", "part2.csv", "part3.csv"],
-        ["part1.csv", "part2.csv", "part3.csv"]
+        ["part1.csv", "part2.csv", "part3.csv"],
     )
 
     ## When files are already present.
@@ -478,9 +467,9 @@ def test_simplify_s3(spark_df, csv_rows, tmp_path, capsys):
             "part7.csv",
             "part8.csv",
             "part6-5.csv",
-            "other.txt"
+            "other.txt",
         ],
-        ["part6.csv", "part7.csv", "part8.csv"]
+        ["part6.csv", "part7.csv", "part8.csv"],
     )
 
     ## Mutiple compressed part files.
@@ -489,7 +478,7 @@ def test_simplify_s3(spark_df, csv_rows, tmp_path, capsys):
     verify_multiple(
         prefix,
         ["part1.csv.gz", "part2.csv.gz", "part3.csv.gz"],
-        ["part1.csv.gz", "part2.csv.gz", "part3.csv.gz"]
+        ["part1.csv.gz", "part2.csv.gz", "part3.csv.gz"],
     )
 
     ## When files are already present.
@@ -513,7 +502,7 @@ def test_simplify_s3(spark_df, csv_rows, tmp_path, capsys):
             "part7.csv.gz",
             "part8.csv.gz",
             "part6-5.csv.gz",
-            "other.txt"
+            "other.txt",
         ],
-        ["part6.csv.gz", "part7.csv.gz", "part8.csv.gz"]
+        ["part6.csv.gz", "part7.csv.gz", "part8.csv.gz"],
     )
