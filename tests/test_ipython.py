@@ -2,155 +2,107 @@ import pytest
 
 from dscitools.ipython import (
     print_md,
+    print_status,
     print_assertion,
     MarkdownMessage,
     StatusMessage,
     AssertMessage,
 )
-
-## Import the module itself so it can be monkeypatched.
-from dscitools import ipython as ip
 from tests.utils import get_notebook_rich_output
 
-
-@pytest.fixture
-def markdown_text():
-    return "Here is some __nice__ `Markdown`."
-
-
-@pytest.fixture
-def markdown_text_encoded():
-    return "Here&nbsp;is&nbsp;some&nbsp;__nice__&nbsp;`Markdown`."
+MARKDOWN_TEXT = "Here is some __nice__ `Markdown`."
+STATUS_TEXT = "This happened"
+ASSERT_RESULT = True
 
 
-@pytest.fixture
-def mock_now():
-    return "Tue Nov 20 15:23:42 2018"
+def encode_message(message):
+    """Encoded message as returned in notebook rich Markdown output."""
+    return message.replace(" ", "&nbsp;")
 
 
-@pytest.fixture
-def status_text():
-    return "This happened"
+def validate_console_output(capsys, result, func, *args):
+    """Test in the console (non-rich) environment."""
+    func(*args)
+    output = capsys.readouterr().out
+    assert output == result + "\n"
 
 
-@pytest.fixture
-def assertion_result():
-    return True
+def validate_notebook_output(result, result_md, func, *args):
+    """Test rich output in the notebook environment."""
+    if result_md == None:
+        result_md = encode_message(result)
+    output = get_notebook_rich_output(func, *args)
+    assert output.get("text/plain") == result
+    assert output.get("text/markdown") == result_md
 
 
-@pytest.fixture
-def assertion_message():
-    return "__Assert__  This happened:  `True`"
+def test_print_md(capsys):
+    expected = "Here is some __nice__ `Markdown`."
+    expected_md = encode_message(expected)
+
+    validate_console_output(capsys, expected, print_md, MARKDOWN_TEXT)
+    validate_notebook_output(expected, expected_md, print_md, MARKDOWN_TEXT)
 
 
-@pytest.fixture
-def assertion_message_encoded():
-    return "__Assert__&nbsp;&nbsp;This&nbsp;happened:&nbsp;&nbsp;`True`"
+def mock_print_status(status_text, mock_dt):
+    # Mock the current time manually rather than using pytest's monkeypatch
+    # so as to work with the `call_func_in_notebook()` function.
+    from dscitools import general
+
+    general.datetime.datetime = mock_dt
+    print_status(status_text)
 
 
-@pytest.fixture
-def status_message():
-    return "This happened:  Tue Nov 20 15:23:42 2018"
-
-
-@pytest.fixture
-def status_message_encoded():
-    return (
-        "__This&nbsp;happened:&nbsp;&nbsp;Tue&nbsp;Nov&nbsp;20&nbsp;"
-        + "15:23:42&nbsp;2018__"
+def test_print_status(capsys, mock_dt):
+    expected = "This happened:  Sat Apr 18 12:36:10 2020"
+    expected_md = encode_message(
+        "__This happened:  Sat Apr 18 12:36:10 2020__"
     )
 
-
-def validate_notebook_output(output, expected_plain, expected_md):
-    ## Did we get the appropriate rich output in the notebook?
-    assert output.get("text/plain") == expected_plain
-    assert output.get("text/markdown") == expected_md
-
-
-def test_print_md(markdown_text, markdown_text_encoded, capsys):
-    ## Test in the console (non-rich) environment.
-    print_md(markdown_text)
-    output = capsys.readouterr().out
-    assert output == markdown_text + "\n"
-
-    ## Test in the notebook environment.
-    nb_output = get_notebook_rich_output(print_md, markdown_text)
-    validate_notebook_output(nb_output, markdown_text, markdown_text_encoded)
-
-
-def mock_print_status(status_text, mock_now_str):
-    ## Mock the current time manually rather than using pytest's monkeypatch
-    ## so as to work with the run_in_notebook() function.
-    # TODO: still necessary?
-    def mocknow():
-        return mock_now_str
-
-    from dscitools import ipython as ip
-
-    _oldnow = ip.now
-    ip.now = mocknow
-    ip.print_status(status_text)
-    ip.now = _oldnow
-
-
-def test_print_status(
-    status_text, status_message, status_message_encoded, capsys, mock_now
-):
-    ## Test in the console (non-rich) environment.
-    mock_print_status(status_text, mock_now)
-    output = capsys.readouterr().out
-    assert output == status_message + "\n"
-
-    ## Test in the notebook environment.
-    nb_output = get_notebook_rich_output(
-        mock_print_status, status_text, mock_now
-    )
-    validate_notebook_output(nb_output, status_message, status_message_encoded)
-
-
-def test_print_assertion(
-    status_text,
-    assertion_result,
-    assertion_message,
-    assertion_message_encoded,
-    capsys,
-):
-    ## Test in the console (non-rich) environment.
-    print_assertion(status_text, assertion_result)
-    output = capsys.readouterr().out
-    assert output == assertion_message + "\n"
-
-    ## Test in the notebook environment.
-    nb_output = get_notebook_rich_output(
-        print_assertion, status_text, assertion_result
+    validate_console_output(
+        capsys, expected, mock_print_status, STATUS_TEXT, mock_dt
     )
     validate_notebook_output(
-        nb_output, assertion_message, assertion_message_encoded
+        expected, expected_md, mock_print_status, STATUS_TEXT, mock_dt
     )
 
 
-def test_markdownmessage(markdown_text, markdown_text_encoded):
-    md_obj = MarkdownMessage(markdown_text)
-    assert md_obj.__repr__() == markdown_text
-    assert md_obj._repr_markdown_() == markdown_text_encoded
+def test_print_assertion(capsys):
+    expected = "__Assert__  This happened:  `True`"
+    expected_md = encode_message(expected)
+
+    validate_console_output(
+        capsys, expected, print_assertion, STATUS_TEXT, ASSERT_RESULT
+    )
+    validate_notebook_output(
+        expected, expected_md, print_assertion, STATUS_TEXT, ASSERT_RESULT
+    )
 
 
-def test_statusmessage(
-    status_text, status_message, status_message_encoded, monkeypatch, mock_now
-):
-    def mocknow():
-        return mock_now
+def test_markdownmessage():
+    expected = "Here is some __nice__ `Markdown`."
+    expected_md = encode_message(expected)
 
-    monkeypatch.setattr(ip, "now", mocknow)
-
-    md_obj = StatusMessage(status_text)
-    assert md_obj.__repr__() == status_message
-    assert md_obj._repr_markdown_() == status_message_encoded
+    md_obj = MarkdownMessage(MARKDOWN_TEXT)
+    assert md_obj.__repr__() == expected
+    assert md_obj._repr_markdown_() == expected_md
 
 
-def test_assertmessage(
-    status_text, assertion_result, assertion_message, assertion_message_encoded
-):
-    md_obj = AssertMessage(status_text, assertion_result)
-    assert md_obj.__repr__() == assertion_message
-    assert md_obj._repr_markdown_() == assertion_message_encoded
+def test_statusmessage(mock_general_datetime):
+    expected = "This happened:  Sat Apr 18 12:36:10 2020"
+    expected_md = encode_message(
+        "__This happened:  Sat Apr 18 12:36:10 2020__"
+    )
+
+    md_obj = StatusMessage(STATUS_TEXT)
+    assert md_obj.__repr__() == expected
+    assert md_obj._repr_markdown_() == expected_md
+
+
+def test_assertmessage():
+    expected = "__Assert__  This happened:  `True`"
+    expected_md = encode_message(expected)
+
+    md_obj = AssertMessage(STATUS_TEXT, ASSERT_RESULT)
+    assert md_obj.__repr__() == expected
+    assert md_obj._repr_markdown_() == expected_md
