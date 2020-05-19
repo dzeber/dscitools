@@ -7,24 +7,22 @@ import inspect
 import warnings
 
 from pandas import DataFrame
+
 try:
     from pandas import isna
 except ImportError:
     # Fix for older versions of pandas
     from pandas import isnull
+
     isna = isnull
 
-from pandas.api.types import (
-    is_list_like,
-    is_integer_dtype,
-    is_float_dtype
-)
+from pandas.api.types import is_list_like, is_integer_dtype, is_float_dtype
 from numpy import isscalar
 
 from .common import to_str, is_str
 
 
-## Simple warning message formatting.
+# Simple warning message formatting.
 def _simple_warn(msg, category=UserWarning, *args, **kwargs):
     """Show a simple warning of the form <type>: <warning message>."""
     print("{categ}: {msg}".format(categ=category.__name__, msg=msg))
@@ -33,12 +31,14 @@ def _simple_warn(msg, category=UserWarning, *args, **kwargs):
 warnings.showwarning = _simple_warn
 
 
-def fmt_df(df,
-           fmt_int=True,
-           fmt_float=True,
-           fmt_percent=None,
-           fmt_dollar=None,
-           precision=None):
+def fmt_df(
+    df,
+    fmt_int=True,
+    fmt_float=True,
+    fmt_percent=None,
+    fmt_dollar=None,
+    precision=None,
+):
     """Wrap the given DataFrame so that it will print with number formatting.
 
     Parameters
@@ -72,22 +72,26 @@ def fmt_df(df,
     -------
     FormattedDataFrame
     """
-    return FormattedDataFrame(df,
-                              fmt_int=fmt_int,
-                              fmt_float=fmt_float,
-                              fmt_percent=fmt_percent,
-                              fmt_dollar=fmt_dollar,
-                              precision=precision)
+    return FormattedDataFrame(
+        df,
+        fmt_int=fmt_int,
+        fmt_float=fmt_float,
+        fmt_percent=fmt_percent,
+        fmt_dollar=fmt_dollar,
+        precision=precision,
+    )
 
 
-def fmt_count_df(df,
-                 n_overall=None,
-                 count_col=None,
-                 order_by_count=False,
-                 show_cum_pct=False,
-                 pct_col_name=None,
-                 fmt=True,
-                 pct_precision=2):
+def fmt_count_df(
+    df,
+    n_overall=None,
+    count_col=None,
+    order_by_count=False,
+    show_cum_pct=False,
+    pct_col_name=None,
+    fmt=True,
+    pct_precision=2,
+):
     """Format a DataFrame for displaying group counts.
 
     This is useful for presenting results or diagnostics in the form of a table
@@ -164,11 +168,13 @@ def fmt_count_df(df,
         columns. If `fmt` is `True`, it is wrapped in a `FormattedDataFrame`.
     """
     if count_col is None:
-        ## Detect count columns.
+        # Detect count columns.
         def is_count_col(colname):
-            return (colname in ("count", "n", "num") or
-                    colname.startswith("n_") or
-                    colname.startswith("num_"))
+            return (
+                colname in ("count", "n", "num")
+                or colname.startswith("n_")
+                or colname.startswith("num_")
+            )
 
         count_col = [col for col in df.columns if is_count_col(col)]
     else:
@@ -178,8 +184,8 @@ def fmt_count_df(df,
                 err_msg = "Count column '{}' was not found in the DataFrame"
                 raise ValueError(err_msg.format(col))
     if len(count_col) > len(set(count_col)):
-        ## This will cause a problem matching against other params by index.
-        ## Rather than just dropping duplicate column names, throw an error.
+        # This will cause a problem matching against other params by index.
+        # Rather than just dropping duplicate column names, throw an error.
         raise ValueError("Cannot handle repeated count column names")
 
     if n_overall is None:
@@ -187,8 +193,10 @@ def fmt_count_df(df,
     elif not is_list_like(n_overall):
         n_overall = [n_overall]
     if len(n_overall) != len(count_col):
-        err_msg = "If specified, there must be as many `n_overall` values" + \
-                  " as count columns"
+        err_msg = (
+            "If specified, there must be as many `n_overall` values"
+            + " as count columns"
+        )
         raise ValueError(err_msg)
 
     if pct_col_name is None:
@@ -196,25 +204,27 @@ def fmt_count_df(df,
     elif not is_list_like(pct_col_name):
         pct_col_name = [pct_col_name]
     if len(pct_col_name) != len(count_col):
-        err_msg = "If specified, there must be as many `pct_col_name`" + \
-                  " values as count columns"
+        err_msg = (
+            "If specified, there must be as many `pct_col_name`"
+            + " values as count columns"
+        )
         raise ValueError(err_msg)
 
     order_cols = []
-    if order_by_count == True:              # noqa: E712
+    if order_by_count == True:  # noqa: E712
         order_cols.append(count_col[0])
     else:
-        ## Fail silently if these are not valid count column names.
+        # Fail silently if these are not valid count column names.
         order_by_count = _col_name_list(order_by_count)
         for col in order_by_count:
             if col in count_col:
                 order_cols.append(col)
 
     cum_pct_col_names = []
-    if show_cum_pct == True:                # noqa: E712
+    if show_cum_pct == True:  # noqa: E712
         cum_pct_col_names = count_col
     else:
-        ## Fail silently if these are not valid count column names.
+        # Fail silently if these are not valid count column names.
         show_cum_pct = _col_name_list(show_cum_pct)
         for col in show_cum_pct:
             if col in count_col:
@@ -224,25 +234,27 @@ def fmt_count_df(df,
     if order_cols:
         pct_df.sort_values(order_cols, ascending=False, inplace=True)
 
-    ## This will be a list of (<pct column name>, <computed pct column>).
+    # This will be a list of (<pct column name>, <computed pct column>).
     pct_cols = []
-    ## This will a similar list for cumulative pct columns.
+    # This will a similar list for cumulative pct columns.
     cum_pct_cols = []
     for i, col in enumerate(count_col):
         denom = n_overall[i]
         if denom is None:
             denom = df[col].sum()
         elif is_str(denom):
-            ## Interpret as a column name.
+            # Interpret as a column name.
             if denom not in df.columns:
-                err_msg = "Totals ('n_overall') column '{}' was not found" + \
-                          "in the DataFrame"
+                err_msg = (
+                    "Totals ('n_overall') column '{}' was not found"
+                    + "in the DataFrame"
+                )
                 raise ValueError(err_msg.format(denom))
             denom = df[denom]
         pct = df[col] / denom
 
         if pct_col_name[i] is None:
-            ## Generate a default name for the percentage column.
+            # Generate a default name for the percentage column.
             def prop_col_name(col):
                 if col == "count":
                     return "proportion"
@@ -262,7 +274,7 @@ def fmt_count_df(df,
 
         pct_cols.append((pct_colname, pct))
 
-        ## Omit cumulative percent columns for which n_overall is not scalar.
+        # Omit cumulative percent columns for which n_overall is not scalar.
         if col in cum_pct_col_names and isscalar(denom):
             cumpct = df[col].cumsum() / denom
             cumpct_colname = "cum " + pct_colname
@@ -271,25 +283,29 @@ def fmt_count_df(df,
     all_pct_cols = []
     for colname, col in pct_cols:
         if colname in pct_df.columns:
-            err_msg = "Attempting to add percent column '{}', but a column" + \
-                      " with this name is already in the DataFrame"
+            err_msg = (
+                "Attempting to add percent column '{}', but a column"
+                + " with this name is already in the DataFrame"
+            )
             raise ValueError(err_msg.format(colname))
         pct_df[colname] = col
         all_pct_cols.append(colname)
     for colname, col in cum_pct_cols:
         if colname in pct_df.columns:
-            err_msg = "Attempting to add cumulative percent column '{}'," + \
-                      " but a column with this name is already in the" + \
-                      " DataFrame"
+            err_msg = (
+                "Attempting to add cumulative percent column '{}',"
+                + " but a column with this name is already in the"
+                + " DataFrame"
+            )
             raise ValueError(err_msg.format(colname))
         pct_df[colname] = col
         all_pct_cols.append(colname)
 
     if fmt:
         precision_arg = {col: pct_precision for col in all_pct_cols}
-        pct_df = FormattedDataFrame(pct_df,
-                                    fmt_percent=all_pct_cols,
-                                    precision=precision_arg)
+        pct_df = FormattedDataFrame(
+            pct_df, fmt_percent=all_pct_cols, precision=precision_arg
+        )
     return pct_df
 
 
@@ -332,54 +348,57 @@ class FormattedDataFrame(DataFrame):
         Dict mapping numeric column names to the number of decimal places they
         should be rounded to. Overrides default precision settings.
     """
+
     INT_DEFAULT_PRECISION = 0
     FLOAT_DEFAULT_PRECISION = 2
     PCT_DEFAULT_PRECISION = 2
     DOLLAR_DEFAULT_PRECISION = 2
     NAN_STRING = "NaN"
 
-    ## Register internal property names to work with DataFrame
-    ## attribute methods.
+    # Register internal property names to work with DataFrame
+    # attribute methods.
     _metadata = [
         "_signature",
         "_dynamic_int",
         "_dynamic_float",
         "_column_precision",
         "_static_formatters",
-        "_constructor_params"
+        "_constructor_params",
     ]
 
-    ## Manipulation result should remain a FormattedDataFrame.
+    # Manipulation result should remain a FormattedDataFrame.
     @property
     def _constructor(self):
-        ## Use the same formatting args that were passed to the
-        ## original instance.
+        # Use the same formatting args that were passed to the
+        # original instance.
         return lambda df: FormattedDataFrame(df, **self._constructor_params)
 
-    def __init__(self,
-                 df,
-                 fmt_int=True,
-                 fmt_float=True,
-                 fmt_percent=None,
-                 fmt_dollar=None,
-                 precision=None):
+    def __init__(
+        self,
+        df,
+        fmt_int=True,
+        fmt_float=True,
+        fmt_percent=None,
+        fmt_dollar=None,
+        precision=None,
+    ):
         super(FormattedDataFrame, self).__init__(data=df, copy=False)
 
-        ## Cache the parameters passed to __init__ for use in the
-        ## _constructor function.
+        # Cache the parameters passed to __init__ for use in the
+        # _constructor function.
         self._constructor_params = {
             "fmt_int": fmt_int,
             "fmt_float": fmt_float,
             "fmt_percent": fmt_percent,
             "fmt_dollar": fmt_dollar,
-            "precision": precision
+            "precision": precision,
         }
 
-        ## Cache the structure of the original DF to check for modification.
+        # Cache the structure of the original DF to check for modification.
         self._signature = self._get_signature()
 
         if precision or precision == 0:
-            ## Explicitly include numeric 0 in type check
+            # Explicitly include numeric 0 in type check
             try:
                 precision = dict(precision)
             except TypeError:
@@ -393,23 +412,25 @@ class FormattedDataFrame(DataFrame):
         else:
             self._column_precision = {}
 
-        ## Set up formatters for columns that requested static formatting.
-        ## Note that the _*_formatter functions rely on the _column_precision
-        ## attribute already being set above.
+        # Set up formatters for columns that requested static formatting.
+        # Note that the _*_formatter functions rely on the _column_precision
+        # attribute already being set above.
         formatters = {}
 
         def ensure_col_not_repeated(col, fmts):
-            ## Check whether the given column already has formatting associated
-            ## with it.
+            # Check whether the given column already has formatting associated
+            # with it.
             if col in fmts:
-                msg = "Column {} was supplied more than once to a" + \
-                      "formatting parameter"
+                msg = (
+                    "Column {} was supplied more than once to a"
+                    + "formatting parameter"
+                )
                 raise ValueError(msg.format(col))
 
         self._dynamic_int = False
-        if fmt_int == True:                 # noqa: E712
+        if fmt_int == True:  # noqa: E712
 
-            ## Check for an explicit boolean value.
+            # Check for an explicit boolean value.
             self._dynamic_int = True
         else:
             int_cols = _col_name_list(fmt_int)
@@ -418,8 +439,8 @@ class FormattedDataFrame(DataFrame):
                 formatters[colname] = self._int_formatter(colname)
 
         self._dynamic_float = False
-        if fmt_float == True:               # noqa: E712
-            ## Check for an explicit boolean value.
+        if fmt_float == True:  # noqa: E712
+            # Check for an explicit boolean value.
             self._dynamic_float = True
         else:
             float_cols = _col_name_list(fmt_float)
@@ -436,7 +457,7 @@ class FormattedDataFrame(DataFrame):
             ensure_col_not_repeated(colname, formatters)
             formatters[colname] = self._dollar_formatter(colname)
 
-        ## Convert the format strings to formatting functions.
+        # Convert the format strings to formatting functions.
         self._static_formatters = self._ensure_fmt_funcs(formatters)
 
     def _get_signature(self):
@@ -459,10 +480,11 @@ class FormattedDataFrame(DataFrame):
             The same dict with any formatting strings transformed to functions.
             Any existing functions are left as-is.
         """
+
         def fmt_func(fmt_spec):
             def fmt_num(x):
                 if isna(x):
-                    ## Override the use of str.format().
+                    # Override the use of str.format().
                     return cls.NAN_STRING
                 return fmt_spec.format(x)
 
@@ -473,8 +495,10 @@ class FormattedDataFrame(DataFrame):
                 return fmt_func(fmtter)
             return fmtter
 
-        return {colname: ensure_fmt_func(fmtter)
-                for colname, fmtter in fmt_dict.items()}
+        return {
+            colname: ensure_fmt_func(fmtter)
+            for colname, fmtter in fmt_dict.items()
+        }
 
     def _df_is_modified(self):
         """Check whether the underlying DF appears to have been modified.
@@ -507,28 +531,30 @@ class FormattedDataFrame(DataFrame):
             A dict mapping column names to formatting functions that will be
             applied to individual column entries.
         """
-        ## If there are static formatters, warn if the DF has been modified
-        ## in a way that might break the original formatting.
+        # If there are static formatters, warn if the DF has been modified
+        # in a way that might break the original formatting.
         if self._static_formatters and self._df_is_modified():
-            modified_msg = "The DF underlying this FormattedDataFrame" + \
-                " instance appears to have changed, and requested " + \
-                " formatting may no longer apply. It is recommended to" + \
-                " create a new instance by calling `fmt_df()`."
+            modified_msg = (
+                "The DF underlying this FormattedDataFrame"
+                + " instance appears to have changed, and requested "
+                + " formatting may no longer apply. It is recommended to"
+                + " create a new instance by calling `fmt_df()`."
+            )
             warnings.warn(modified_msg)
 
         formatters = {}
         if self._dynamic_float:
             float_cols = self._detect_numeric_cols("float")
             for colname in float_cols:
-                ## Formatting specified by column name overrides automatic
-                ## detection.
+                # Formatting specified by column name overrides automatic
+                # detection.
                 if colname not in self._static_formatters:
                     formatters[colname] = self._float_formatter(colname)
         if self._dynamic_int:
             int_cols = self._detect_numeric_cols("int")
             for colname in int_cols:
-                ## Note that this will override float formatting in the case
-                ## of int columns with NaNs.
+                # Note that this will override float formatting in the case
+                # of int columns with NaNs.
                 if colname not in self._static_formatters:
                     formatters[colname] = self._int_formatter(colname)
         formatters = self._ensure_fmt_funcs(formatters)
@@ -540,20 +566,22 @@ class FormattedDataFrame(DataFrame):
 
         Returns a tuple of column names.
         """
-        ## Use specific functions for int and float to include
-        ## all related types.
+        # Use specific functions for int and float to include
+        # all related types.
         def _is_float_col(col):
             return is_float_dtype(self.dtypes[col])
 
         def _is_int_col(col):
             if is_integer_dtype(self.dtypes[col]):
                 return True
-            ## Columns that are integer except for the fact of having NaNs
-            ## should be formatted as int (unless the column is all NaN).
+            # Columns that are integer except for the fact of having NaNs
+            # should be formatted as int (unless the column is all NaN).
             if _is_float_col(col):
                 col_nona = self[col].dropna()
-                if (len(col_nona) > 0 and
-                        col_nona.apply(float.is_integer).all()):
+                if (
+                    len(col_nona) > 0
+                    and col_nona.apply(float.is_integer).all()
+                ):
                     return True
             return False
 
@@ -580,37 +608,37 @@ class FormattedDataFrame(DataFrame):
         args, kwargs
             Other args passed to `to_*()`.
         """
-        ## Check whether formatters are already supplied.
-        ## Do this by matching up supplied args against the signature
-        ## of the overriden method.
+        # Check whether formatters are already supplied.
+        # Do this by matching up supplied args against the signature
+        # of the overriden method.
         fmt_func = "to_{}".format(fmt)
         super_method = getattr(super(FormattedDataFrame, self), fmt_func)
         try:
             super_method_sig = inspect.signature(super_method)
             super_bound_args = super_method_sig.bind(*args, **kwargs).arguments
         except AttributeError:
-            ## Compat with Python < 3.5
-            super_bound_args = inspect.getcallargs(super_method,
-                                                   *args,
-                                                   **kwargs)
+            # Compat with Python < 3.5
+            super_bound_args = inspect.getcallargs(
+                super_method, *args, **kwargs
+            )
             del super_bound_args["self"]
         supplied_fmt = super_bound_args.get("formatters")
         if not supplied_fmt:
-            ## Compat:
-            ## With signature(), if the 'formatters' arg is not supplied,
-            ## it will not be in super_bound_args.
-            ## With getcallargs(), it will have an entry in super_bound_args
-            ## with value None.
+            # Compat:
+            # With signature(), if the 'formatters' arg is not supplied,
+            # it will not be in super_bound_args.
+            # With getcallargs(), it will have an entry in super_bound_args
+            # with value None.
             supplied_fmt = {}
-        ## If supplied, the formatting arg could be either
-        ## a list of length equal to the number of columns or a dict.
-        ## If a list, this means a formatter is specified for each column.
-        ## Since we are not overriding these, we delegate back to the
-        ## super method.
+        # If supplied, the formatting arg could be either
+        # a list of length equal to the number of columns or a dict.
+        # If a list, this means a formatter is specified for each column.
+        # Since we are not overriding these, we delegate back to the
+        # super method.
         if isinstance(supplied_fmt, dict):
-            ## Merge supplied formatters into the dict produced in this class.
+            # Merge supplied formatters into the dict produced in this class.
             computed_fmt = self._get_formatters()
-            ## Formatters supplied in args override default numeric formatting.
+            # Formatters supplied in args override default numeric formatting.
             computed_fmt.update(supplied_fmt)
             super_bound_args["formatters"] = computed_fmt
 
@@ -626,32 +654,36 @@ class FormattedDataFrame(DataFrame):
 
     def _int_formatter(self, col_name):
         """Returns the format specifier string applied to int columns."""
-        precision = self._column_precision.get(col_name,
-                                               self.INT_DEFAULT_PRECISION)
+        precision = self._column_precision.get(
+            col_name, self.INT_DEFAULT_PRECISION
+        )
         return "{{: ,.{prec}f}}".format(prec=precision)
 
     def _float_formatter(self, col_name):
         """Returns the format specifier string applied to float columns."""
-        precision = self._column_precision.get(col_name,
-                                               self.FLOAT_DEFAULT_PRECISION)
+        precision = self._column_precision.get(
+            col_name, self.FLOAT_DEFAULT_PRECISION
+        )
         return "{{: ,.{prec}f}}".format(prec=precision)
 
     def _pct_formatter(self, col_name):
         """Returns the format specifier string applied to percent columns."""
-        precision = self._column_precision.get(col_name,
-                                               self.PCT_DEFAULT_PRECISION)
+        precision = self._column_precision.get(
+            col_name, self.PCT_DEFAULT_PRECISION
+        )
         return "{{: ,.{prec}%}}".format(prec=precision)
 
     def _dollar_formatter(self, col_name):
         """Returns the format specifier string applied to dollar columns."""
-        precision = self._column_precision.get(col_name,
-                                               self.DOLLAR_DEFAULT_PRECISION)
+        precision = self._column_precision.get(
+            col_name, self.DOLLAR_DEFAULT_PRECISION
+        )
         fmt_str = "{{: ,.{prec}f}}".format(prec=precision)
 
         def fmt_val(x):
             if isna(x):
                 return self.NAN_STRING
-            ## Insert a dollar sign after the positive/negative sign position.
+            # Insert a dollar sign after the positive/negative sign position.
             x_fmt = fmt_str.format(x)
             if len(x_fmt) > 0:
                 x_fmt = x_fmt[0] + "$" + x_fmt[1:]

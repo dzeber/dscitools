@@ -5,8 +5,8 @@ Utilities for displaying information with IPython in the Jupyter notebook.
 from __future__ import print_function
 from .general import now
 
-## Keep the use of IPython display() optional.
-## If not available, fall back to the standard print().
+# Keep the use of IPython display() optional.
+# If not available, fall back to the standard print().
 try:
     from IPython.display import display
 except ImportError:
@@ -23,9 +23,9 @@ def print_md(markdown_text):
     markdown_text : str
         The Markdown text to be displayed.
     """
-    ## Markdown can also be displayed using IPython.display.Markdown,
-    ## but this doesn't fall back elegantly when rich display is not available
-    ## (eg. in the console).
+    # Markdown can also be displayed using IPython.display.Markdown,
+    # but this doesn't fall back elegantly when rich display is not available
+    # (eg. in the console).
     md_message = MarkdownMessage(markdown_text)
     display(md_message)
 
@@ -77,6 +77,7 @@ class MarkdownMessage(object):
     message : str
         The Markdown text to be displayed.
     """
+
     def __init__(self, message):
         self._message = message
 
@@ -116,13 +117,13 @@ class StatusMessage(MarkdownMessage):
     message : str
         The status message to be displayed.
     """
+
     MESSAGE_TEMPLATE = "{msg}:  {time}"
     MARKDOWN_TEMPLATE = "__{}__"
 
     def _create_timestamped_message(self):
         """Format the status message with the current timestamp."""
-        return self.MESSAGE_TEMPLATE.format(msg=self._message,
-                                            time=now())
+        return self.MESSAGE_TEMPLATE.format(msg=self._message, time=now())
 
     def __repr__(self):
         """Print the raw text of the status message."""
@@ -150,8 +151,10 @@ class AssertMessage(MarkdownMessage):
     result : bool
         The outcome of the assertion test.
     """
+
     MESSAGE_TEMPLATE = "__Assert__  {msg}:  `{result}`"
 
     def __init__(self, message, result):
-        self._message = self.MESSAGE_TEMPLATE.format(msg=message,
-                                                     result=result)
+        self._message = self.MESSAGE_TEMPLATE.format(
+            msg=message, result=result
+        )

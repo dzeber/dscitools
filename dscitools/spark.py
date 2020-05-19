@@ -72,7 +72,7 @@ def count_distinct(df, *cols):
         the number of distinct rows in the DataFrame.
     """
     if len(cols) > 0:
-        ## Delegate type handling for the col args to select().
+        # Delegate type handling for the col args to select().
         df = df.select(*cols)
     return df.distinct().count()
 
@@ -92,21 +92,21 @@ def _simplify_csv_local(output_dir, new_files_since=0):
         A timestamp in seconds representing the earliest write date to consider.
         Simplifaction is restricted to files written since this datetime.
     """
-    ## Detect keys written since the given time cutoff.
+    # Detect keys written since the given time cutoff.
     new_files = []
     for fname in os.listdir(output_dir):
         fpath = os.path.join(output_dir, fname)
         if os.path.isfile(fpath) and os.stat(fpath).st_ctime > new_files_since:
             new_files.append(fname)
-    ## Identify the data files, and delete the rest.
+    # Identify the data files, and delete the rest.
     new_csvs = []
     for fname in new_files:
         if fname.endswith(".csv") or fname.endswith(".csv.gz"):
             new_csvs.append(fname)
         else:
-            ## This is a non-data file that was automatically generated
-            ## by Spark.
-            ## Delete.
+            # This is a non-data file that was automatically generated
+            # by Spark.
+            # Delete.
             try:
                 os.remove(os.path.join(output_dir, fname))
             except OSError:
@@ -114,18 +114,18 @@ def _simplify_csv_local(output_dir, new_files_since=0):
 
     remaining_contents = os.listdir(output_dir)
     if len(new_csvs) == 1 and remaining_contents == new_csvs:
-        ## The only thing left in the dir is the new CSV.
-        ## Replace the output dir with that file.
+        # The only thing left in the dir is the new CSV.
+        # Replace the output dir with that file.
         output_file = new_csvs[0]
         output_path = os.path.join(output_dir, output_file)
-        ## Move the CSV to a temp dir, and delete the original output dir.
+        # Move the CSV to a temp dir, and delete the original output dir.
         tmpdir = tempfile.mkdtemp()
         tmp_path = os.path.join(tmpdir, output_file)
         os.rename(output_path, tmp_path)
         os.rmdir(output_dir)
 
-        ## The output dir name will be used as the new filename.
-        ## Attempt to make sure it has the appropriate extension.
+        # The output dir name will be used as the new filename.
+        # Attempt to make sure it has the appropriate extension.
         norm_path = os.path.normpath(output_dir)
         is_gzipped = output_file.endswith(".gz")
         if is_gzipped:
@@ -140,24 +140,27 @@ def _simplify_csv_local(output_dir, new_files_since=0):
                 csv_file = norm_path
             else:
                 csv_file = "{}.csv".format(norm_path)
-        ## However, don't overwrite if the new filename already exists.
+        # However, don't overwrite if the new filename already exists.
         target_exists = os.path.exists(csv_file)
         if target_exists:
             print("Target file {} already exists.".format(csv_file))
             csv_file = norm_path
-        ## Move the CSV back under the new filename.
+        # Move the CSV back under the new filename.
         os.rename(tmp_path, csv_file)
         os.rmdir(tmpdir)
-        print("{}CSV output was written to {}.".format(
-            ## Mention compression explicitly if the output filename doesn't
-            ## include the '.gz' extension.
-            "Gzipped " if (target_exists and is_gzipped) else "",
-            csv_file))
+        print(
+            "{}CSV output was written to {}.".format(
+                # Mention compression explicitly if the output filename doesn't
+                # include the '.gz' extension.
+                "Gzipped " if (target_exists and is_gzipped) else "",
+                csv_file,
+            )
+        )
 
     else:
-        ## There are multiple files in the output dir.
-        ## Rename the new CSV files to `partNNN.csv`.
-        ## Make sure to avoid conflicting with any existing files.
+        # There are multiple files in the output dir.
+        # Rename the new CSV files to `partNNN.csv`.
+        # Make sure to avoid conflicting with any existing files.
         existing_part_nums = []
         for fname in remaining_contents:
             if fname.startswith("part"):
@@ -177,35 +180,40 @@ def _simplify_csv_local(output_dir, new_files_since=0):
                 existing_part_nums.append(part_num)
             except ValueError:
                 continue
-        next_part_num = max(existing_part_nums) + 1 if existing_part_nums else 1
+        next_part_num = (
+            max(existing_part_nums) + 1 if existing_part_nums else 1
+        )
         new_csvs.sort()
         first_part_file = None
         for output_file in new_csvs:
             new_filename = "part{num}.csv{gz}".format(
                 num=next_part_num,
-                gz=".gz" if output_file.endswith(".gz") else ""
+                gz=".gz" if output_file.endswith(".gz") else "",
             )
             if first_part_file is None:
                 first_part_file = new_filename
-            os.rename(os.path.join(output_dir, output_file),
-                      os.path.join(output_dir, new_filename))
+            os.rename(
+                os.path.join(output_dir, output_file),
+                os.path.join(output_dir, new_filename),
+            )
             next_part_num += 1
-        print("CSV output was written to {} across files {} to {}.".format(
-            output_dir,
-            first_part_file,
-            new_filename))
+        print(
+            "CSV output was written to {} across files {} to {}.".format(
+                output_dir, first_part_file, new_filename
+            )
+        )
 
 
 def _s3_prefix_exists(s3, bucket, prefix):
     """Check if the given prefix exists in a S3 bucket."""
-    ## Check if the prefix either matches an object exactly or is part of a
-    ## longer key.
+    # Check if the prefix either matches an object exactly or is part of a
+    # longer key.
     if prefix.endswith("/"):
         prefix = prefix[:-1]
 
     try:
-        ## Request metadata, treating `prefix` as an object key.
-        ## This will fail if the object doesn't exist.
+        # Request metadata, treating `prefix` as an object key.
+        # This will fail if the object doesn't exist.
         s3.head_object(Bucket=bucket, Key=prefix)
     except ClientError as e:
         if e.response["Error"]["Code"] != "404":
@@ -213,11 +221,10 @@ def _s3_prefix_exists(s3, bucket, prefix):
     else:
         return True
 
-    ## Otherwise, check if it is part of a longer key.
-    sub_objects = s3.list_objects_v2(Bucket=bucket,
-                                     Prefix=prefix + "/",
-                                     Delimiter="/",
-                                     MaxKeys=1)
+    # Otherwise, check if it is part of a longer key.
+    sub_objects = s3.list_objects_v2(
+        Bucket=bucket, Prefix=prefix + "/", Delimiter="/", MaxKeys=1
+    )
     return sub_objects["KeyCount"] > 0
 
 
@@ -242,58 +249,60 @@ def _simplify_csv_s3(s3_path, new_keys_since=0):
     if not output_dir_prefix.endswith("/"):
         output_dir_prefix += "/"
 
-    ## Detect keys written since the given time cutoff.
+    # Detect keys written since the given time cutoff.
     new_keys = []
     start_time_utc = datetime.datetime.utcfromtimestamp(new_keys_since)
-    ## Using `Delimiter="/"` means non-recursive listing, ie. up to and
-    ## including the next "/" in their key, if any.
-    contents = s3.list_objects_v2(Bucket=bucket,
-                                  Prefix=output_dir_prefix,
-                                  Delimiter="/",
-                                  MaxKeys=1000)
-    ## Assume we are working with relatively few keys.
-    ## Otherwise, fail out of simplification for now.
+    # Using `Delimiter="/"` means non-recursive listing, ie. up to and
+    # including the next "/" in their key, if any.
+    contents = s3.list_objects_v2(
+        Bucket=bucket, Prefix=output_dir_prefix, Delimiter="/", MaxKeys=1000
+    )
+    # Assume we are working with relatively few keys.
+    # Otherwise, fail out of simplification for now.
     if contents["IsTruncated"]:
         raise NotImplementedError(
             "Prefix {} matches >1000 objects.".format(output_dir_prefix)
         )
-    ## Contents contains only actual keys, not common prefixes ("subdirs").
+    # Contents contains only actual keys, not common prefixes ("subdirs").
     for obj in contents.get("Contents", []):
-        ## To compare datetimes, need to remove timezone from the
-        ## S3 last modified times.
+        # To compare datetimes, need to remove timezone from the
+        # S3 last modified times.
         if obj["LastModified"].replace(tzinfo=None) > start_time_utc:
             new_keys.append(obj["Key"])
-    ## Identify the data files, and delete the rest.
+    # Identify the data files, and delete the rest.
     new_csvs = []
     to_delete = []
     for key in new_keys:
         if key.endswith(".csv") or key.endswith(".csv.gz"):
             new_csvs.append(key)
         else:
-            ## This is a non-data file that was automatically generated
-            ## by Spark.
-            ## Delete.
+            # This is a non-data file that was automatically generated
+            # by Spark.
+            # Delete.
             to_delete.append(key)
-    s3.delete_objects(Bucket=bucket,
-                      Delete={"Objects": [{"Key": k} for k in to_delete]})
+    s3.delete_objects(
+        Bucket=bucket, Delete={"Objects": [{"Key": k} for k in to_delete]}
+    )
 
-    ## Check if the output "dir" has any further subkeys beyond the CSVs,
-    ## including sub-"directories".
-    remaining_contents = s3.list_objects_v2(Bucket=bucket,
-                                            Prefix=output_dir_prefix,
-                                            Delimiter="/")
+    # Check if the output "dir" has any further subkeys beyond the CSVs,
+    # including sub-"directories".
+    remaining_contents = s3.list_objects_v2(
+        Bucket=bucket, Prefix=output_dir_prefix, Delimiter="/"
+    )
     remaining_keys = [
         obj["Key"] for obj in remaining_contents.get("Contents", [])
     ]
-    if len(new_csvs) == 1\
-            and not remaining_contents["IsTruncated"]\
-            and not remaining_contents.get("CommonPrefixes")\
-            and remaining_keys == new_csvs:
-        ## The only thing left in the dir is the new CSV.
-        ## Replace the output dir key with that file.
+    if (
+        len(new_csvs) == 1
+        and not remaining_contents["IsTruncated"]
+        and not remaining_contents.get("CommonPrefixes")
+        and remaining_keys == new_csvs
+    ):
+        # The only thing left in the dir is the new CSV.
+        # Replace the output dir key with that file.
         output_file = new_csvs[0]
-        ## The output dir name will be used as the new filename.
-        ## Attempt to make sure it has the appropriate extension.
+        # The output dir name will be used as the new filename.
+        # Attempt to make sure it has the appropriate extension.
         target_key = output_dir_prefix.rstrip("/")
         is_gzipped = output_file.endswith(".gz")
         if is_gzipped:
@@ -308,41 +317,42 @@ def _simplify_csv_s3(s3_path, new_keys_since=0):
                 csv_file = target_key
             else:
                 csv_file = "{}.csv".format(target_key)
-        ## However, don't overwrite if the new filename already exists.
-        target_exists = (
-            (csv_file != target_key) and _s3_prefix_exists(s3, bucket, csv_file)
+        # However, don't overwrite if the new filename already exists.
+        target_exists = (csv_file != target_key) and _s3_prefix_exists(
+            s3, bucket, csv_file
         )
         if target_exists:
             print("Target key {} already exists.".format(csv_file))
             csv_file = target_key
-        ## Move the CSV to the new key.
-        s3.copy({"Bucket": bucket, "Key": output_file},
-                bucket,
-                csv_file)
+        # Move the CSV to the new key.
+        s3.copy({"Bucket": bucket, "Key": output_file}, bucket, csv_file)
         s3.delete_object(Bucket=bucket, Key=output_file)
-        print("{}CSV output was written to {}.".format(
-            ## Mention compression explicitly if the output key doesn't
-            ## include the '.gz' extension.
-            "Gzipped " if (target_exists and is_gzipped) else "",
-            csv_file))
+        print(
+            "{}CSV output was written to {}.".format(
+                # Mention compression explicitly if the output key doesn't
+                # include the '.gz' extension.
+                "Gzipped " if (target_exists and is_gzipped) else "",
+                csv_file,
+            )
+        )
 
     else:
-        ## Avoid dealing with pagination for now.
-        ## Just fail out of simplification if there are too many keys.
+        # Avoid dealing with pagination for now.
+        # Just fail out of simplification if there are too many keys.
         if remaining_contents["IsTruncated"]:
             raise NotImplementedError(
                 "Prefix {} matches too many objects.".format(output_dir_prefix)
             )
-        ## There are multiple files in the output dir.
-        ## Rename the new CSV files to `partNNN.csv`.
-        ## Make sure to avoid conflicting with any existing files.
+        # There are multiple files in the output dir.
+        # Rename the new CSV files to `partNNN.csv`.
+        # Make sure to avoid conflicting with any existing files.
         remaining_prefixes = [
             p["Prefix"] for p in remaining_contents.get("CommonPrefixes", [])
         ]
         all_objects = remaining_prefixes + remaining_keys
         existing_part_nums = []
         for key in all_objects:
-            ## Chop off the intial dir prefix and the final "/", if any.
+            # Chop off the intial dir prefix and the final "/", if any.
             key = key[len(output_dir_prefix):].rstrip("/")
             if key.startswith("part"):
                 key = key[4:]
@@ -361,25 +371,30 @@ def _simplify_csv_s3(s3_path, new_keys_since=0):
                 existing_part_nums.append(part_num)
             except ValueError:
                 continue
-        next_part_num = max(existing_part_nums) + 1 if existing_part_nums else 1
+        next_part_num = (
+            max(existing_part_nums) + 1 if existing_part_nums else 1
+        )
         new_csvs.sort()
         first_part_file = None
         for output_file in new_csvs:
             new_filename = "part{num}.csv{gz}".format(
                 num=next_part_num,
-                gz=".gz" if output_file.endswith(".gz") else ""
+                gz=".gz" if output_file.endswith(".gz") else "",
             )
             if first_part_file is None:
                 first_part_file = new_filename
-            s3.copy({"Bucket": bucket, "Key": output_file},
-                    bucket,
-                    output_dir_prefix + new_filename)
+            s3.copy(
+                {"Bucket": bucket, "Key": output_file},
+                bucket,
+                output_dir_prefix + new_filename,
+            )
             s3.delete_object(Bucket=bucket, Key=output_file)
             next_part_num += 1
-        print("CSV output was written to {} across files {} to {}.".format(
-            output_dir_prefix,
-            first_part_file,
-            new_filename))
+        print(
+            "CSV output was written to {} across files {} to {}.".format(
+                output_dir_prefix, first_part_file, new_filename
+            )
+        )
 
 
 def _is_s3_path(path):
@@ -391,12 +406,9 @@ def _is_s3_path(path):
     return False
 
 
-def dump_to_csv(df,
-                path,
-                write_mode=None,
-                num_parts=1,
-                compress=True,
-                simplify=True):
+def dump_to_csv(
+    df, path, write_mode=None, num_parts=1, compress=True, simplify=True
+):
     """Dump a DataFrame to CSV.
 
     The data is written to CSV in standard format with UTF-8 encoding by
@@ -440,21 +452,22 @@ def dump_to_csv(df,
         Should the default Spark output be simplified? Defaults to `True`.
     """
     start_time = time.time()
-    df.repartition(num_parts)\
-        .write.csv(path,
-                   mode=write_mode,
-                   compression="gzip" if compress else None,
-                   header=True,
-                   nullValue="")
+    df.repartition(num_parts).write.csv(
+        path,
+        mode=write_mode,
+        compression="gzip" if compress else None,
+        header=True,
+        nullValue="",
+    )
     if not simplify:
-        ## We are done.
+        # We are done.
         return
 
-    ## Otherwise, run the appropriate simplfication logic.
+    # Otherwise, run the appropriate simplfication logic.
     if _is_s3_path(path):
         _simplify_csv_s3(path, start_time)
     else:
-        ## Detect which files/objects were newly written by Spark.
+        # Detect which files/objects were newly written by Spark.
         _simplify_csv_local(path, start_time)
 
 
@@ -473,7 +486,7 @@ def get_colname(col):
     str
         The column's name.
     """
-    ## The name doesn't appear to be accessible as a property from the Python
-    ## Column object.
-    ## This mirrors what Column.__repr__ does.
+    # The name doesn't appear to be accessible as a property from the Python
+    # Column object.
+    # This mirrors what Column.__repr__ does.
     return col._jc.toString()

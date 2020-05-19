@@ -104,8 +104,8 @@ def compare_formatting(
     comp_func=compare_formatteddataframe_string_html,
     **kwargs
 ):
-    ## Test both the string and HTML representations for explicit object
-    ## creation and the API function.
+    # Test both the string and HTML representations for explicit object
+    # creation and the API function.
     fmt_obj = FormattedDataFrame(original, **kwargs)
     fmt_api = fmt_df(original, **kwargs)
     comp_func(fmt_obj, expected)
@@ -113,8 +113,8 @@ def compare_formatting(
 
 
 def dollar_fmt(v):
-    ## Apply dollar formatting with the dollar sign in front
-    ## of any minus signs.
+    # Apply dollar formatting with the dollar sign in front
+    # of any minus signs.
     v_fmt = "{:,.2f}".format(v)
     if v_fmt.startswith("-"):
         v_fmt = v_fmt[0] + "$" + v_fmt[1:]
@@ -145,9 +145,9 @@ def test_explicit_formatter_override(df):
     )[["group", "num", "prop"]]
 
     explicit_fmt = {
-        ## This should override dynamic detection of "num" as an int column.
+        # This should override dynamic detection of "num" as an int column.
         "num": "{: .1f}".format,
-        ## This should override static formatting of "prop" as a pct column.
+        # This should override static formatting of "prop" as a pct column.
         "prop": "{: .4f}".format,
     }
 
@@ -192,8 +192,8 @@ def test_static_formatting(df):
     compare_formatting(
         df,
         expected,
-        ## Override automatic int formatting for 'numfl'.
-        ## This also deactivates float column detection.
+        # Override automatic int formatting for 'numfl'.
+        # This also deactivates float column detection.
         fmt_float="numfl",
         fmt_percent="pct",
         fmt_dollar="amount",
@@ -222,21 +222,21 @@ def test_modified_formatteddataframe(df):
     expected["num"] = expected["num"].apply("{:,}".format)
     expected["prop"] = expected["prop"].apply("{:.2f}".format)
 
-    ## Subsetting a FDF.
+    # Subsetting a FDF.
     fdf = FormattedDataFrame(df)
     assert fdf[["prop"]].to_string() == expected[["prop"]].to_string()
     assert fdf[["prop"]].to_html() == expected[["prop"]].to_html()
     assert fdf[:3].to_string() == expected[:3].to_string()
     assert fdf[:3].to_html() == expected[:3].to_html()
 
-    ## Adding a column to a FDF with no static formatting.
+    # Adding a column to a FDF with no static formatting.
     fdf2 = fdf.copy()
     fdf2["prop2"] = fdf2["prop"]
     expected["prop2"] = df["prop"].apply("{:.2f}".format)
     assert fdf2.to_string() == expected.to_string()
     assert fdf2.to_html() == expected.to_html()
 
-    ## Adding a column to a FDF with static formatting.
+    # Adding a column to a FDF with static formatting.
     fdf3 = FormattedDataFrame(df, fmt_percent="prop")
     fdf3["prop2"] = fdf3["prop"]
     expected["prop"] = df["prop"].apply("{:.2%}".format)
@@ -263,7 +263,7 @@ def test_fmt_args(df):
         }
     )[["group", "num", "prop", "numfl", "pct"]]
 
-    ## Formatting params should accept both single strings and list-likes.
+    # Formatting params should accept both single strings and list-likes.
     df["numfl"] = df["num"]
     df["pct"] = df["prop"]
 
@@ -273,7 +273,7 @@ def test_fmt_args(df):
         fmt_int="num",
         fmt_float=["numfl", "prop"],
         fmt_percent={"pct"},
-        ## This should get silently ignored.
+        # This should get silently ignored.
         fmt_dollar=4,
     )
 
@@ -292,7 +292,7 @@ def test_fmt_na_handling(df):
         }
     )[["group", "num", "prop"]]
 
-    ## Formatting should work as if NaNs were excluded.
+    # Formatting should work as if NaNs were excluded.
     compare_formatting(df, expected)
 
     expected = DataFrame(
@@ -320,15 +320,15 @@ def test_fmt_na_handling(df):
 
 ### Testing for fmt_count_df ###
 
-## This mainly covers the different ways args can be passed.
+# This mainly covers the different ways args can be passed.
 
 
 def test_fmt_count_default(count_df, prop_df, count_total_df, prop_total_df):
-    ## Test the default behaviour when no switches are used.
+    # Test the default behaviour when no switches are used.
     result = fmt_count_df(count_df, fmt=False)
     assert result.equals(prop_df)
 
-    ## Multiple count columns.
+    # Multiple count columns.
     result = fmt_count_df(
         count_total_df, count_col=["count", "total"], fmt=False
     )
@@ -338,14 +338,14 @@ def test_fmt_count_default(count_df, prop_df, count_total_df, prop_total_df):
 def test_fmt_count_n_overall(
     count_df, count_total_df, prop_df, prop_total_df, n_overall
 ):
-    ## Default case is covered in test_fmt_count_default().
-    ## Case when n_overall is a number:
+    # Default case is covered in test_fmt_count_default().
+    # Case when n_overall is a number:
     expected = prop_df.copy()
     expected["proportion"] = expected["count"] / n_overall
     result = fmt_count_df(count_df, n_overall=n_overall, fmt=False)
     assert result.equals(expected)
 
-    ## Case when n_overall is a column.
+    # Case when n_overall is a column.
     expected = prop_total_df.copy()
     expected = expected.drop("prop_total", axis="columns")
     expected["proportion"] = expected["count"] / expected["total"]
@@ -354,7 +354,7 @@ def test_fmt_count_n_overall(
     result = fmt_count_df(count_total_df, n_overall=["total"], fmt=False)
     assert result.equals(expected)
 
-    ## Case when n_overall is a list.
+    # Case when n_overall is a list.
     expected = prop_total_df.copy()
     expected["prop_total"] = expected["total"] / n_overall
     result = fmt_count_df(
@@ -375,9 +375,9 @@ def test_fmt_count_n_overall(
     )
     assert result.equals(expected)
 
-    ## Reversing the count column order should reverse the order in which
-    ## the proportion columns appear in the result, with the n_overall list
-    ## elements applied to the count column names in the same order.
+    # Reversing the count column order should reverse the order in which
+    # the proportion columns appear in the result, with the n_overall list
+    # elements applied to the count column names in the same order.
     expected = prop_total_df.copy()
     expected["proportion"] = expected["count"] / expected["total"]
     expected["prop_total"] = expected["total"] / n_overall
@@ -399,8 +399,8 @@ def test_fmt_count_colnames(count_total_df, prop_total_df):
     assert result.equals(expected)
     result = fmt_count_df(count_total_df, count_col=["total"], fmt=False)
     assert result.equals(expected)
-    ## The order of the proportion columns should follow the order of
-    ## the count colunms.
+    # The order of the proportion columns should follow the order of
+    # the count colunms.
     expected = prop_total_df[
         ["group", "count", "total", "prop_total", "proportion"]
     ]
@@ -411,8 +411,8 @@ def test_fmt_count_colnames(count_total_df, prop_total_df):
 
 
 def test_fmt_count_naming_schemes(count_df, prop_df):
-    ## Test automatic detection of count columns by naming scheme
-    ## and corresponding automatic naming of proportion columns.
+    # Test automatic detection of count columns by naming scheme
+    # and corresponding automatic naming of proportion columns.
     count_df["n"] = count_df["count"]
     count_df["num"] = count_df["count"]
     count_df["n_items"] = count_df["count"]
@@ -446,7 +446,7 @@ def test_fmt_count_naming_schemes(count_df, prop_df):
 
 
 def test_fmt_count_col_sort(count_df, count_total_df, prop_df, prop_total_df):
-    ## Test sorting by count column.
+    # Test sorting by count column.
     prop_df = prop_df.sort_values("count", ascending=False)
     result = fmt_count_df(count_df, order_by_count=True, fmt=False)
     assert result.equals(prop_df)
@@ -465,7 +465,7 @@ def test_fmt_count_col_sort(count_df, count_total_df, prop_df, prop_total_df):
         fmt=False,
     )
     assert result.equals(prop_total_df)
-    ## Sorting should use the first count column when unspecified.
+    # Sorting should use the first count column when unspecified.
     expected = prop_total_df[
         ["group", "count", "total", "prop_total", "proportion"]
     ]
@@ -479,7 +479,7 @@ def test_fmt_count_col_sort(count_df, count_total_df, prop_df, prop_total_df):
 
 
 def test_fmt_count_cum_pct(count_df, count_total_df, prop_df, prop_total_df):
-    ## Test appending cumulative percentages.
+    # Test appending cumulative percentages.
     prop_df["cum proportion"] = prop_df["proportion"].cumsum()
     result = fmt_count_df(count_df, show_cum_pct=True, fmt=False)
     assert result.equals(prop_df)
@@ -504,8 +504,8 @@ def test_fmt_count_cum_pct(count_df, count_total_df, prop_df, prop_total_df):
         fmt=False,
     )
     assert result.equals(prop_total_df)
-    ## Ordering of the cumulative proportion columns follows
-    ## count column ordering.
+    # Ordering of the cumulative proportion columns follows
+    # count column ordering.
     result = fmt_count_df(
         count_total_df,
         count_col=["count", "total"],
@@ -513,7 +513,7 @@ def test_fmt_count_cum_pct(count_df, count_total_df, prop_df, prop_total_df):
         fmt=False,
     )
     assert result.equals(prop_total_df)
-    ## Cumulative prop for a single count column only.
+    # Cumulative prop for a single count column only.
     result = fmt_count_df(
         count_total_df,
         count_col=["count", "total"],
@@ -526,7 +526,7 @@ def test_fmt_count_cum_pct(count_df, count_total_df, prop_df, prop_total_df):
 def test_fmt_count_pct_colnames(
     count_df, count_total_df, prop_df, prop_total_df
 ):
-    ## Test supplying custom names for the percent columns.
+    # Test supplying custom names for the percent columns.
     prop_df = prop_df.rename(columns={"proportion": "thepct"})
     result = fmt_count_df(count_df, pct_col_name="thepct", fmt=False)
     assert result.equals(prop_df)
@@ -554,14 +554,14 @@ def test_fmt_count_pct_colnames(
 
 
 def test_fmt_count_fmt_precision(count_df, prop_df):
-    ## Test the conversion to FormattedDataFrame.
+    # Test the conversion to FormattedDataFrame.
     expected = prop_df.copy()
     expected["count"] = expected["count"].apply("{:,}".format)
     expected["proportion"] = expected["proportion"].apply("{:.2%}".format)
     result = fmt_count_df(count_df)
     compare_formatteddataframe_string_html(result, expected)
 
-    ## Custom precision for percent columns.
+    # Custom precision for percent columns.
     expected = prop_df.copy()
     expected["count"] = expected["count"].apply("{:,}".format)
     expected["proportion"] = expected["proportion"].apply("{:.4%}".format)

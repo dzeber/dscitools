@@ -1,5 +1,3 @@
-import pytest
-
 from dscitools.ipython import (
     print_md,
     print_status,
@@ -29,7 +27,7 @@ def validate_console_output(capsys, result, func, *args):
 
 def validate_notebook_output(result, result_md, func, *args):
     """Test rich output in the notebook environment."""
-    if result_md == None:
+    if result_md is None:
         result_md = encode_message(result)
     output = get_notebook_rich_output(func, *args)
     assert output.get("text/plain") == result
