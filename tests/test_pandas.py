@@ -59,11 +59,6 @@ def formatteddataframe_notebook_display(fdf):
     Returns (plaintext, html) outputs. HTML output is restricted to the `table`
     element.
     """
-    # nb_output = call_func_in_notebook(display, fdf)
-    # assert len(nb_output) == 1
-    # nb_output = nb_output[0]
-    # assert nb_output.get("output_type") == "display_data"
-    # data = nb_output.get("data", {})
     data = get_notebook_rich_output(display, fdf)
     df_str = data.get("text/plain")
     # The notebook may inject additional styling, etc.
@@ -75,7 +70,18 @@ def formatteddataframe_notebook_display(fdf):
     return (df_str, df_html_match.group())
 
 
-def compare_formatteddataframe_string_html(fdf, expected):
+def compare_fdf_string_html(fdf, expected):
+    """Test string and HMTL representations of a FormattedDataFrame.
+
+    Compares both against the corresponding representations for an expected DF.
+
+    The FormattedDataFrame is also rendered using both representations in a
+    Jupyter notebook context, and the results are compared against the same
+    expected versions.
+
+    Note that this assumes the notebook representation will match the expected
+    `to_html()` result.
+    """
     expected_str = expected.to_string()
     expected_html = expected.to_html()
 
@@ -84,8 +90,29 @@ def compare_formatteddataframe_string_html(fdf, expected):
 
     nb_str, nb_html = formatteddataframe_notebook_display(fdf)
     assert nb_str == expected.to_string()
-    # TODO: enable
     assert nb_html == expected.to_html()
+
+
+def compare_formatting(
+    observed,
+    expected,
+    comp_func=compare_fdf_string_html,
+    **kwargs
+):
+    """Test formatting for a DataFrame via FormattedDataFrame.
+
+    This tests both explicit object instantiation as well as the API function.
+    Comparisons are made in terms of both the string and HTML representations.
+
+    Generated FDFs and expected DF are passed to the given comparison function,
+    which should include `assert` statements as appropriate.
+
+    Additional keywords args are passed to the FDF instantiation.
+    """
+    fdf_obj = FormattedDataFrame(observed, **kwargs)
+    fdf_api = fmt_df(observed, **kwargs)
+    comp_func(fdf_obj, expected)
+    comp_func(fdf_api, expected)
 
 
 def compare_formatteddataframe_string_html_explicit(fdf, expected, formatters):
@@ -93,31 +120,6 @@ def compare_formatteddataframe_string_html_explicit(fdf, expected, formatters):
     assert fdf.to_string(formatters=formatters) == expected.to_string()
     assert fdf.to_html(formatters=formatters) == expected.to_html()
     # TODO: use notebook output?
-
-
-def compare_formatting(
-    original,
-    expected,
-    comp_func=compare_formatteddataframe_string_html,
-    **kwargs
-):
-    # Test both the string and HTML representations for explicit object
-    # creation and the API function.
-    fmt_obj = FormattedDataFrame(original, **kwargs)
-    fmt_api = fmt_df(original, **kwargs)
-    comp_func(fmt_obj, expected)
-    comp_func(fmt_api, expected)
-
-
-# def dollar_fmt(v):
-#     # Apply dollar formatting with the dollar sign in front
-#     # of any minus signs.
-#     v_fmt = "{:,.2f}".format(v)
-#     if v_fmt.startswith("-"):
-#         v_fmt = v_fmt[0] + "$" + v_fmt[1:]
-#     else:
-#         v_fmt = "$" + v_fmt
-#     return v_fmt
 
 
 def test_default_formatting(df):
@@ -552,49 +554,52 @@ def test_fmt_count_cum_pct(count_df, count_total_df, prop_df, prop_total_df):
     assert result.equals(prop_total_df.drop("cum proportion", axis="columns"))
 
 
-@pytest.mark.skip
-def test_fmt_count_pct_colnames(
-    count_df, count_total_df, prop_df, prop_total_df
-):
-    # Test supplying custom names for the percent columns.
-    prop_df = prop_df.rename(columns={"proportion": "thepct"})
-    result = fmt_count_df(count_df, pct_col_name="thepct", fmt=False)
-    assert result.equals(prop_df)
-    result = fmt_count_df(count_df, pct_col_name=["thepct"], fmt=False)
-    assert result.equals(prop_df)
+def test_fmt_count_pct_colnames(count_df, count_total_df):
+    expected_df = DataFrame({
+        "group": ["a", "b", "c"],
+        "count": ["10,235", "325", "6,426"],
+        "total": ["15,590", "498", "15,593"],
+        "thepct": ["60.26%", "1.91%", "37.83%"],
+        "prop_total": ["49.21%", "1.57%", "49.22%"],
+    })[["group", "count", "total", "thepct", "prop_total"]]
 
-    expected = prop_total_df.rename(columns={"proportion": "thepct"})
+    # Test supplying custom names for the percent columns.
+    expected = expected_df[["group", "count", "thepct"]]
+    result = fmt_count_df(count_df, pct_col_name="thepct")
+    compare_fdf_string_html(result, expected)
+    result = fmt_count_df(count_df, pct_col_name=["thepct"])
+    compare_fdf_string_html(result, expected)
+
+    # When there are multiple count columns
+    expected = expected_df
     result = fmt_count_df(
         count_total_df,
         count_col=["count", "total"],
         pct_col_name=["thepct", None],
-        fmt=False,
     )
-    assert result.equals(expected)
-    expected = prop_total_df.rename(
-        columns={"proportion": "thepct", "prop_total": "totpct"}
-    )
+    compare_fdf_string_html(result, expected)
+
+    expected = expected_df.rename(columns={"prop_total": "totpct"})
     result = fmt_count_df(
         count_total_df,
         count_col=["count", "total"],
         pct_col_name=["thepct", "totpct"],
-        fmt=False,
     )
-    assert result.equals(expected)
+    compare_fdf_string_html(result, expected)
 
 
-@pytest.mark.skip
-def test_fmt_count_fmt_precision(count_df, prop_df):
+def test_fmt_count_fmt_precision(count_df):
+    expected = DataFrame({
+        "group": ["a", "b", "c"],
+        "count": ["10,235", "325", "6,426"],
+        "proportion": ["60.26%", "1.91%", "37.83%"],
+    })[["group", "count", "proportion"]]
+
     # Test the conversion to FormattedDataFrame.
-    expected = prop_df.copy()
-    expected["count"] = expected["count"].apply("{:,}".format)
-    expected["proportion"] = expected["proportion"].apply("{:.2%}".format)
     result = fmt_count_df(count_df)
-    compare_formatteddataframe_string_html(result, expected)
+    compare_fdf_string_html(result, expected)
 
     # Custom precision for percent columns.
-    expected = prop_df.copy()
-    expected["count"] = expected["count"].apply("{:,}".format)
-    expected["proportion"] = expected["proportion"].apply("{:.4%}".format)
+    expected["proportion"] = ["60.2555%", "1.9133%", "37.8312%"]
     result = fmt_count_df(count_df, pct_precision=4)
-    compare_formatteddataframe_string_html(result, expected)
+    compare_fdf_string_html(result, expected)
