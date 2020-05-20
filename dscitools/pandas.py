@@ -6,8 +6,11 @@ from __future__ import division, absolute_import
 import inspect
 import warnings
 
-from pandas import DataFrame
-
+from pandas import DataFrame, get_option
+try:
+    from pandas.io.formats.format import DataFrameFormatter
+except ImportError:
+    from pandas.formats.format import DataFrameFormatter
 try:
     from pandas import isna
 except ImportError:
@@ -15,7 +18,6 @@ except ImportError:
     from pandas import isnull
 
     isna = isnull
-
 from pandas.api.types import is_list_like, is_integer_dtype, is_float_dtype
 from numpy import isscalar
 
@@ -651,6 +653,56 @@ class FormattedDataFrame(DataFrame):
     def to_html(self, *args, **kwargs):
         """Override `DataFrame.to_html()` to apply custom formatting."""
         return self._to_fmt_with_formatters("html", *args, **kwargs)
+
+    def _repr_html_(self):
+        """Show custom formatting in the notebook.
+
+        This is the function called to produce HTML display in a Jupyter
+        notebook. In pandas<0.25.1, this delegated to `to_html`, automatically
+        pulling in FormattedDataFrame modifications. As of pandas 0.25.1,
+        `DataFrame._repr_html_` creates a `DataFrameFormatter` directly
+        without calling `to_html`, because `to_html` doesn't allow for setting
+        a minimum number of rows.
+
+        Override `_repr_html_` to preserve the underlying functionality for
+        `DataFrame`s while pulling in the custom formatters when rendering
+        in the notebook.
+        """
+        if not self._info_repr() and get_option("display.notebook_repr_html"):
+            kwargs = {
+                "columns": None,
+                "col_space": None,
+                "na_rep": "NaN",
+                "formatters": self._get_formatters(),
+                "float_format": None,
+                "sparsify": None,
+                "justify": None,
+                "index_names": True,
+                "header": True,
+                "index": True,
+                "bold_rows": True,
+                "escape": True,
+                "max_rows": get_option("display.max_rows"),
+                "max_cols": get_option("display.max_columns"),
+                "show_dimensions": get_option("display.show_dimensions"),
+                "decimal": ".",
+                "table_id": None,
+                "render_links": False,
+            }
+            try:
+                min_rows = get_option("display.min_rows")
+                kwargs["min_rows"] = min_rows
+            except KeyError:
+                pass
+
+            formatter = DataFrameFormatter(self, **kwargs)
+            html_result = formatter.to_html(notebook=True)
+            if not html_result:
+                # Compat with pandas<1.0
+                html_result = formatter.buf.getvalue()
+            return html_result
+        else:
+            super(FormattedDataFrame, self)._repr_html_()
 
     def _int_formatter(self, col_name):
         """Returns the format specifier string applied to int columns."""
