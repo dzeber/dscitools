@@ -2,6 +2,7 @@ import re
 
 import pytest
 from pandas import DataFrame
+
 try:
     from pandas.testing import assert_frame_equal
 except ImportError:
@@ -29,6 +30,7 @@ COUNT_DF = {
 
 N_OVERALL = 20000
 
+
 @pytest.fixture
 def df():
     return DataFrame(BASE_DF)[["group", "num", "prop"]]
@@ -46,7 +48,10 @@ def count_df():
 
 @pytest.fixture
 def prop_total_df():
-    return DataFrame(COUNT_DF)[["group", "count", "total", "proportion", "prop_total"]]
+    return DataFrame(COUNT_DF)[
+        ["group", "count", "total", "proportion", "prop_total"]
+    ]
+
 
 @pytest.fixture
 def prop_df():
@@ -94,10 +99,7 @@ def compare_fdf_string_html(fdf, expected):
 
 
 def compare_formatting(
-    observed,
-    expected,
-    comp_func=compare_fdf_string_html,
-    **kwargs
+    observed, expected, comp_func=compare_fdf_string_html, **kwargs
 ):
     """Test formatting for a DataFrame via FormattedDataFrame.
 
@@ -317,20 +319,22 @@ def test_fmt_na_handling(df):
     )
 
 
-### Testing for fmt_count_df ###
+#-- Testing for fmt_count_df --#
 
 # This mainly covers the different ways args can be passed.
 
 
 @pytest.mark.skip
 def test_fmt_count_default(count_df, count_total_df):
-    expected = DataFrame({
-        "group": ["a", "b", "c"],
-        "count": ["10,235", "325", "6,426"],
-        "total": ["15,590", "498", "15,593"],
-        "proportion": ["60.26%", "1.91%", "37.83%"],
-        "prop_total": ["49.21%", "1.57%", "49.22%"],
-    })[["group", "count", "total", "proportion", "prop_total"]]
+    expected = DataFrame(
+        {
+            "group": ["a", "b", "c"],
+            "count": ["10,235", "325", "6,426"],
+            "total": ["15,590", "498", "15,593"],
+            "proportion": ["60.26%", "1.91%", "37.83%"],
+            "prop_total": ["49.21%", "1.57%", "49.22%"],
+        }
+    )[["group", "count", "total", "proportion", "prop_total"]]
 
     # Test the default behaviour when no switches are used.
     result = fmt_count_df(count_df)
@@ -342,13 +346,15 @@ def test_fmt_count_default(count_df, count_total_df):
 
 
 def test_fmt_count_nofmt(count_df, count_total_df):
-    expected = DataFrame({
-        "group": ["a", "b", "c"],
-        "count": [10235, 325, 6426],
-        "total": [15590, 498, 15593],
-        "proportion": [0.602555045, 0.019133404, 0.378311551],
-        "prop_total": [0.492093053, 0.015719201, 0.492187747],
-    })[["group", "count", "total", "proportion", "prop_total"]]
+    expected = DataFrame(
+        {
+            "group": ["a", "b", "c"],
+            "count": [10235, 325, 6426],
+            "total": [15590, 498, 15593],
+            "proportion": [0.602555045, 0.019133404, 0.378311551],
+            "prop_total": [0.492093053, 0.015719201, 0.492187747],
+        }
+    )[["group", "count", "total", "proportion", "prop_total"]]
 
     # Test the default behaviour when no switches are used.
     result = fmt_count_df(count_df, fmt=False)
@@ -362,9 +368,7 @@ def test_fmt_count_nofmt(count_df, count_total_df):
 
 
 @pytest.mark.skip
-def test_fmt_count_n_overall(
-    count_df, count_total_df, prop_df, prop_total_df
-):
+def test_fmt_count_n_overall(count_df, count_total_df, prop_df, prop_total_df):
     # Default case is covered in test_fmt_count_default().
     # Case when n_overall is a number:
     expected = prop_df.copy()
@@ -555,13 +559,15 @@ def test_fmt_count_cum_pct(count_df, count_total_df, prop_df, prop_total_df):
 
 
 def test_fmt_count_pct_colnames(count_df, count_total_df):
-    expected_df = DataFrame({
-        "group": ["a", "b", "c"],
-        "count": ["10,235", "325", "6,426"],
-        "total": ["15,590", "498", "15,593"],
-        "thepct": ["60.26%", "1.91%", "37.83%"],
-        "prop_total": ["49.21%", "1.57%", "49.22%"],
-    })[["group", "count", "total", "thepct", "prop_total"]]
+    expected_df = DataFrame(
+        {
+            "group": ["a", "b", "c"],
+            "count": ["10,235", "325", "6,426"],
+            "total": ["15,590", "498", "15,593"],
+            "thepct": ["60.26%", "1.91%", "37.83%"],
+            "prop_total": ["49.21%", "1.57%", "49.22%"],
+        }
+    )[["group", "count", "total", "thepct", "prop_total"]]
 
     # Test supplying custom names for the percent columns.
     expected = expected_df[["group", "count", "thepct"]]
@@ -589,11 +595,13 @@ def test_fmt_count_pct_colnames(count_df, count_total_df):
 
 
 def test_fmt_count_fmt_precision(count_df):
-    expected = DataFrame({
-        "group": ["a", "b", "c"],
-        "count": ["10,235", "325", "6,426"],
-        "proportion": ["60.26%", "1.91%", "37.83%"],
-    })[["group", "count", "proportion"]]
+    expected = DataFrame(
+        {
+            "group": ["a", "b", "c"],
+            "count": ["10,235", "325", "6,426"],
+            "proportion": ["60.26%", "1.91%", "37.83%"],
+        }
+    )[["group", "count", "proportion"]]
 
     # Test the conversion to FormattedDataFrame.
     result = fmt_count_df(count_df)
