@@ -7,6 +7,7 @@ import inspect
 import warnings
 
 from pandas import DataFrame, get_option
+
 try:
     from pandas.io.formats.format import DataFrameFormatter
 except ImportError:

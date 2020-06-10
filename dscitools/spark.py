@@ -244,7 +244,7 @@ def _simplify_csv_s3(s3_path, new_keys_since=0):
         Simplifaction is restricted to keys written since this datetime.
     """
     s3 = boto3.client("s3")
-    base_path = s3_path[(s3_path.find("://") + 3):]
+    base_path = s3_path[(s3_path.find("://") + 3) :]
     bucket, output_dir_prefix = base_path.split("/", 1)
     if not output_dir_prefix.endswith("/"):
         output_dir_prefix += "/"
@@ -353,7 +353,7 @@ def _simplify_csv_s3(s3_path, new_keys_since=0):
         existing_part_nums = []
         for key in all_objects:
             # Chop off the intial dir prefix and the final "/", if any.
-            key = key[len(output_dir_prefix):].rstrip("/")
+            key = key[len(output_dir_prefix) :].rstrip("/")
             if key.startswith("part"):
                 key = key[4:]
             else:
