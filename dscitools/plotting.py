@@ -2,6 +2,9 @@
 Utilities for plotting with GGPlot.
 """
 
+from __future__ import division
+
+from numpy import amin, amax, floor, ceil, arange
 from plotnine import theme
 
 # Default width in inches
@@ -43,3 +46,20 @@ def figsize(width=None, height=None, ratio=None):
             width=width, height=height, ratio=ratio
         )
     )
+
+
+def interval_breaks(interval=1):
+    """Breaks for a continuous scale at fixed intervals.
+
+    Returns a function that can be passed to the `breaks` arg
+    of a continuous scale, generating regularly-spaced breaks
+    at the specified `interval` size.
+    """
+
+    def generate_breaks(limits):
+        """ Compute breaks at set intervals between the given limits. """
+        start = ceil(amin(limits) / interval) * interval
+        end = floor(amax(limits) / interval) * interval
+        return arange(start, end + interval * 0.5, step=interval)
+
+    return generate_breaks

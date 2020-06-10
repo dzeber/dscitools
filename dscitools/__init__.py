@@ -10,3 +10,4 @@ from .spark import (
     dump_to_csv,
     get_colname,
 )
+from .plotting import figsize, interval_breaks
