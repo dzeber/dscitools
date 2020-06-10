@@ -4,7 +4,8 @@ import pytest
 from pandas import DataFrame
 from numpy import nan as npnan
 from IPython.display import display
-from dscitools.pandas import FormattedDataFrame, fmt_df, fmt_count_df
+from dscitools import fmt_df, fmt_count_df
+from dscitools.pandas import FormattedDataFrame
 from tests.utils import get_notebook_rich_output
 
 

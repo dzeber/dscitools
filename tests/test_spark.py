@@ -9,14 +9,14 @@ from pyspark.sql.utils import AnalysisException
 import boto3
 from moto import mock_s3
 
-from dscitools.spark import (
+from dscitools import (
     show_df,
     renew_cache,
     get_colname,
     count_distinct,
     dump_to_csv,
-    _simplify_csv_s3,
 )
+from dscitools.spark import _simplify_csv_s3
 
 
 @pytest.fixture(scope="module")
@@ -382,7 +382,7 @@ def test_simplify_s3(spark_df, csv_rows, tmp_path, capsys):
             )
         )
         objects = list(BUCKET.objects.filter(Prefix=prefix))
-        objects = [obj.key[len(prefix):] for obj in objects]
+        objects = [obj.key[len(prefix) :] for obj in objects]
         assert set(objects) == set(all_contents)
 
         out_dir = tmp_path.joinpath(prefix + "_out")

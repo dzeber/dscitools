@@ -1,11 +1,5 @@
-from dscitools.ipython import (
-    print_md,
-    print_status,
-    print_assertion,
-    MarkdownMessage,
-    StatusMessage,
-    AssertMessage,
-)
+from dscitools import print_md, print_status, print_assertion
+from dscitools.ipython import MarkdownMessage, StatusMessage, AssertMessage
 from tests.utils import get_notebook_rich_output
 
 MARKDOWN_TEXT = "Here is some __nice__ `Markdown`."

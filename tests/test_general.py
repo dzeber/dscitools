@@ -1,7 +1,7 @@
 import pytest
 from numpy import array as nparray
 
-from dscitools.general import fmt_count, now, today
+from dscitools import fmt_count, now, today
 
 COUNT = 3592
 DESCRIPTION = "Number of items"
