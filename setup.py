@@ -47,7 +47,13 @@ setup(
         "Topic :: Scientific/Engineering :: Information Analysis",
     ],
     packages=find_packages(exclude=["tests"]),
-    install_requires=["numpy", "pandas", "six", "boto3", "plotnine",],
+    install_requires=[
+        "numpy",
+        "pandas>=0.22",
+        "six",
+        "boto3",
+        "plotnine"
+    ],
     tests_require=test_deps,
     extras_require=extras,
 )
