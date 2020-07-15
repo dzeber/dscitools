@@ -1,6 +1,20 @@
-from dscitools import figsize, interval_breaks
+from dscitools import figsize, interval_breaks, x_comma_fmt, y_comma_fmt
 
+import pytest
 from numpy import allclose
+from pandas import DataFrame
+import plotnine as gg
+
+
+LARGENUM_DF = {
+    "x": [3937, 170, 2744, 1224, 639],
+    "y": [3961, 2014, 1977, 70, -2659],
+}
+
+
+@pytest.fixture
+def largenum_df():
+    return DataFrame(LARGENUM_DF)
 
 
 def validate_figure_size(th, w, h):
@@ -45,3 +59,31 @@ def test_interval_breaks():
     breaks = interval_breaks(100)
     validate_breaks(breaks, 150, 250, [200])
     validate_breaks(breaks, 0, 1, [])
+
+
+def validate_ticks(ggp, axis, expected):
+    # Check that a rendered ggplot has the expected axis ticks.
+    fig = ggp.draw()
+    ax = fig.get_axes()[0]
+    get_ticklabs = getattr(ax, "get_{}ticklabels".format(axis))
+    tick_labs = [t.get_text() for t in get_ticklabs()]
+    assert tick_labs == expected
+
+
+def test_comma_fmt(largenum_df):
+    base_ggp = gg.ggplot(largenum_df, gg.aes(x="x", y="y")) + gg.geom_point()
+    other_labs = lambda vals: ["{:.1f}".format(x) for x in vals]
+
+    ggp = base_ggp + x_comma_fmt()
+    validate_ticks(ggp, "x", ["0", "1,000", "2,000", "3,000", "4,000"])
+    ggp = base_ggp + x_comma_fmt(breaks=[1000, 3000])
+    validate_ticks(ggp, "x", ["1,000", "3,000"])
+    ggp = base_ggp + x_comma_fmt(labels=other_labs)
+    validate_ticks(ggp, "x", ["0.0", "1000.0", "2000.0", "3000.0", "4000.0"])
+
+    ggp = base_ggp + y_comma_fmt()
+    validate_ticks(ggp, "y", ["-2,000", "0", "2,000", "4,000"])
+    ggp = base_ggp + y_comma_fmt(breaks=[-1000, 1000, 3000])
+    validate_ticks(ggp, "y", ["-1,000", "1,000", "3,000"])
+    ggp = base_ggp + y_comma_fmt(labels=other_labs)
+    validate_ticks(ggp, "y", ["-2000.0", "0.0", "2000.0", "4000.0"])

@@ -5,7 +5,8 @@ Utilities for plotting with GGPlot.
 from __future__ import division
 
 from numpy import amin, amax, floor, ceil, arange
-from plotnine import theme
+import plotnine as gg
+import mizani as scales
 
 # Default width in inches
 DEFAULT_PLOT_WIDTH = 8
@@ -41,7 +42,7 @@ def figsize(width=None, height=None, ratio=None):
 
     Returns a ggplot theme with `figure_size` set that can be added to a plot.
     """
-    return theme(
+    return gg.theme(
         figure_size=_compute_figure_size(
             width=width, height=height, ratio=ratio
         )
@@ -63,3 +64,33 @@ def interval_breaks(interval=1):
         return arange(start, end + interval * 0.5, step=interval)
 
     return generate_breaks
+
+
+def _comma_fmt(axis, **kwargs):
+    """Continuous axis with comma formatting.
+
+    kwargs: additional params passed to the ggplot scale function. These take
+    precedence.
+    """
+    args = {"labels": scales.formatters.comma_format()}
+    args.update(kwargs)
+    axis_func = getattr(gg, "scale_{}_continuous".format(axis))
+    return axis_func(**args)
+
+
+def x_comma_fmt(**kwargs):
+    """Continuous `x` axis with comma formatting for large numbers.
+
+    kwargs: additional params passed to the ggplot scale function. These take
+    precedence.
+    """
+    return _comma_fmt("x", **kwargs)
+
+
+def y_comma_fmt(**kwargs):
+    """Continuous `y` axis with comma formatting for large numbers.
+
+    kwargs: additional params passed to the ggplot scale function. These take
+    precedence.
+    """
+    return _comma_fmt("y", **kwargs)
